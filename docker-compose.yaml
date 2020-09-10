@@ -1,0 +1,87 @@
+version: "3.1"
+services:
+  etcd:
+    container_name: etcd0
+    image: gcr.io/etcd-development/etcd:v3.4.3 # quay.io/coreos/etcd:v3.4.3 wzshiming/etcd:v3.4.3 registry.aliyuncs.com/google_containers/etcd:3.4.3
+    restart: always
+    ports:
+      - 2379:2379
+    command:
+      - etcd
+      - --data-dir
+      - /etcd-data
+      - --name
+      - node0
+      - --initial-advertise-peer-urls
+      - http://0.0.0.0:2380
+      - --listen-peer-urls
+      - http://0.0.0.0:2380
+      - --advertise-client-urls
+      - http://0.0.0.0:2379
+      - --listen-client-urls
+      - http://0.0.0.0:2379
+      - --initial-cluster
+      - node0=http://0.0.0.0:2380
+    volumes:
+      - ./etcd-data:/etcd-data:rw
+
+  kube_apiserver:
+    container_name: kube_apiserver
+    image: k8s.gcr.io/kube-apiserver:v1.18.8 # wzshiming/kube-apiserver:v1.18.8 registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.8
+    restart: always
+    ports:
+      - 8080:8080
+    command:
+      - kube-apiserver
+      - --admission-control
+      - ""
+      - --etcd-servers
+      - http://etcd0:2379
+      - --etcd-prefix
+      - /prefix/registry
+      - --insecure-bind-address
+      - 0.0.0.0
+      - --insecure-port
+      - "8080"
+      - --default-watch-cache-size
+      - "10000"
+    links:
+      - etcd
+
+  kube_controller:
+    container_name: kube_controller
+    image: k8s.gcr.io/kube-controller-manager:v1.18.8 # wzshiming/kube-controller-manager:v1.18.8 registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.8
+    restart: always
+    command:
+      - kube-controller-manager
+      - --kubeconfig
+      - /root/.kube/config
+    volumes:
+      - ./kubeconfig:/root/.kube/config:ro
+    links:
+      - kube_apiserver
+
+  kube_scheduler:
+    container_name: kube_scheduler
+    image: k8s.gcr.io/kube-scheduler:v1.18.8 # wzshiming/kube-scheduler:v1.18.8 registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.8
+    restart: always
+    command:
+      - kube-scheduler
+      - --kubeconfig
+      - /root/.kube/config
+    volumes:
+      - ./kubeconfig:/root/.kube/config:ro
+    links:
+      - kube_apiserver
+
+  fake_kubelet:
+    container_name: fake_kubelet
+    image: wzshiming/fake-kubelet:v0.2.2
+    restart: always
+    command:
+      - --kubeconfig
+      - /root/.kube/config
+    volumes:
+      - ./kubeconfig:/root/.kube/config:ro
+    links:
+      - kube_apiserver
