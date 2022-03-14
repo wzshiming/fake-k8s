@@ -185,6 +185,10 @@ function delete_cluster() {
   echo "Deleted cluster ${full_name}."
 }
 
+function list_cluster() {
+  docker-compose ls --all --filter=name=fake-k8s-
+}
+
 TMPDIR="${TMPDIR:-/tmp/}"
 
 function usage() {
@@ -192,6 +196,7 @@ function usage() {
   echo "COMMAND:"
   echo "  create [NAME]"
   echo "  delete [NAME]"
+  echo "  list"
   echo "ARGUMENTS:"
   echo "  NAME: name of the cluster"
   echo "        default: 'default'"
@@ -247,6 +252,9 @@ function main() {
     ;;
   "delete")
     delete_cluster "${name}"
+    ;;
+  "list")
+    list_cluster
     ;;
   *)
     usage
