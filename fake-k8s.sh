@@ -147,8 +147,8 @@ EOF
 
 function create_cluster() {
   local name="${1}"
-  local port="${2:-8080}"
-  local replicas="${3:-5}"
+  local port="${2}"
+  local replicas="${3}"
   local full_name="fake-k8s-${name}"
   local tmpdir="${TMPDIR}/fake-k8s/${name}"
   mkdir -p "${tmpdir}"
@@ -193,19 +193,15 @@ TMPDIR="${TMPDIR:-/tmp/}"
 
 function usage() {
   echo "Usage $0"
-  echo "COMMAND:"
-  echo "  create [NAME]"
-  echo "  delete [NAME]"
-  echo "  list"
-  echo "ARGUMENTS:"
-  echo "  NAME: name of the cluster"
-  echo "        default: 'default'"
-  echo "FLAGS:"
-  echo "  -h, --help: show this help"
-  echo "  -r, --replicas: number of replicas of the node"
-  echo "        default: '5'"
-  echo "  -p, --port: port of the apiserver of the cluster"
-  echo "        default: '8080'"
+  echo "Commands:"
+  echo "  create    Creates one fake cluster"
+  echo "  delete    Deletes one fake cluster"
+  echo "  list      List all fake cluster"
+  echo "Flags:"
+  echo "  -h, --help               show this help"
+  echo "  -n, --name string        cluster name (default: 'default')"
+  echo "  -r, --replicas uint32    number of replicas of the node (default: '5')"
+  echo "  -p, --port uint16        port of the apiserver of the cluster (default: '8080')"
 }
 
 function main() {
@@ -214,8 +210,9 @@ function main() {
     return 1
   fi
 
-  local replicas
-  local port
+  local replicas="5"
+  local port="8080"
+  local name="default"
   local args=()
 
   while [[ $# -gt 0 ]]; do
@@ -226,6 +223,9 @@ function main() {
       ;;
     -p | -p=* | --port | --port=*)
       [[ "${key#*=}" != "$key" ]] && port="${key#*=}" || { port="$2" && shift; }
+      ;;
+    -n | -n=* | --name | --name=*)
+      [[ "${key#*=}" != "$key" ]] && name="${key#*=}" || { name="$2" && shift; }
       ;;
     -h | --help)
       usage
@@ -244,7 +244,6 @@ function main() {
   fi
 
   local command="${args[0]}"
-  local name="${args[1]:-default}"
 
   case "${command}" in
   "create")

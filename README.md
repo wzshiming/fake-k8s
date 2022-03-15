@@ -2,26 +2,22 @@
 
 ``` console
 Usage ./fake-k8s.sh
-COMMAND:
-  create [NAME]
-  delete [NAME]
-  list
-ARGUMENTS:
-  NAME: name of the cluster
-        default: 'default'
-FLAGS:
-  -h, --help: show this help
-  -r, --replicas: number of replicas of the node
-        default: '5'
-  -p, --port: port of the apiserver of the cluster
-        default: '8080'
+Commands:
+  create    Creates one fake cluster
+  delete    Deletes one fake cluster
+  list      List all fake cluster
+Flags:
+  -h, --help               show this help
+  -n, --name string        cluster name (default: 'default')
+  -r, --replicas uint32    number of replicas of the node (default: '5')
+  -p, --port uint16        port of the apiserver of the cluster (default: '8080')
 ```
 
 ## Cteate cluster
 
 ``` console
-./fake-k8s.sh create c1 -p 8081
-./fake-k8s.sh create c2 -p 8082
+./fake-k8s.sh create -n c1 -p 8081
+./fake-k8s.sh create -n c2 -p 8082
 ```
 
 ## Get node of cluster
@@ -48,6 +44,6 @@ fake-k8s-c2         running(5)
 ## Delete cluster
 
 ``` console
-./fake-k8s.sh delete c1
-./fake-k8s.sh delete c2
+./fake-k8s.sh delete -n c1
+./fake-k8s.sh delete -n c2
 ```
