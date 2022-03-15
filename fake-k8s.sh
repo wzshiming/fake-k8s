@@ -184,7 +184,7 @@ function create_cluster() {
 
   docker network create "${full_name}"
 
-  docker-compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+  docker compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
   kubectl config set "clusters.${full_name}.server" "http://127.0.0.1:${port}"
   kubectl config set "contexts.${full_name}.cluster" "${full_name}"
@@ -202,7 +202,7 @@ function delete_cluster() {
   local name="${1}"
   local full_name="fake-k8s-${name}"
 
-  docker-compose -p "${full_name}" down
+  docker compose -p "${full_name}" down
 
   docker network rm "${full_name}"
 
@@ -213,7 +213,7 @@ function delete_cluster() {
 }
 
 function list_cluster() {
-  docker-compose ls --all --filter=name=fake-k8s-
+  docker compose ls --all --filter=name=fake-k8s-
 }
 
 TMPDIR="${TMPDIR:-/tmp/}"
