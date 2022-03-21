@@ -1,5 +1,62 @@
 #!/usr/bin/env bash
 
+declare -A etcdVersions=(
+  ["8"]="3.0.17"
+  ["9"]="3.1.12"
+  ["10"]="3.1.12"
+  ["11"]="3.2.18"
+  ["12"]="3.2.24"
+  ["13"]="3.2.24"
+  ["14"]="3.3.10"
+  ["15"]="3.3.10"
+  ["16"]="3.3.17-0"
+  ["17"]="3.4.3-0"
+  ["18"]="3.4.3-0"
+  ["19"]="3.4.13-0"
+  ["20"]="3.4.13-0"
+  ["21"]="3.4.13-0"
+  ["22"]="3.5.1-0"
+  ["23"]="3.5.1-0"
+  ["24"]="3.5.1-0"
+)
+
+function get_release_version() {
+  local version="${1}"
+  local releaseVersion
+  releaseVersion="${version#*.}"
+  releaseVersion="${releaseVersion%%.*}"
+  echo "${releaseVersion}"
+}
+
+function get_etcd_version() {
+  local kubeVersion="${1}"
+  local releaseVersion
+  local etcdVersion
+  releaseVersion="$(get_release_version "${kubeVersion}")"
+  if [[ "${releaseVersion}" -gt "24" ]]; then
+    etcdVersion="3.5.1-0"
+  elif [[ "${releaseVersion}" -lt "8" ]]; then
+    etcdVersion="3.0.17"
+  else
+    etcdVersion="${etcdVersions[${releaseVersion}]}"
+  fi
+  echo "${etcdVersion}"
+}
+
+function init_global_flags() {
+  FAKE_VERSION="${FAKE_VERSION:-v0.3.3}"
+  KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
+  ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
+
+  KUBE_IMAGE_PREFIX="${KUBE_IMAGE_PREFIX:-k8s.gcr.io}"
+  FAKE_IMAGE_PREFIX="${FAKE_IMAGE_PREFIX:-ghcr.io/wzshiming/fake-kubelet}"
+  IMAGE_ETCD="${IMAGE_ETCD:-${KUBE_IMAGE_PREFIX}/etcd:${ETCD_VERSION}}"
+  IMAGE_KUBE_APISERVER="${IMAGE_KUBE_APISERVER:-${KUBE_IMAGE_PREFIX}/kube-apiserver:${KUBE_VERSION}}"
+  IMAGE_KUBE_CONTROLLER_MANAGER="${IMAGE_KUBE_CONTROLLER_MANAGER:-${KUBE_IMAGE_PREFIX}/kube-controller-manager:${KUBE_VERSION}}"
+  IMAGE_KUBE_SCHEDULER="${IMAGE_KUBE_SCHEDULER:-${KUBE_IMAGE_PREFIX}/kube-scheduler:${KUBE_VERSION}}"
+  IMAGE_FAKE_KUBELET="${IMAGE_FAKE_KUBELET:-${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}}"
+}
+
 function incluster_kubeconfig() {
   local name="${1}"
   cat <<EOF
@@ -28,7 +85,7 @@ version: "3.1"
 services:
   etcd:
     container_name: "${name}-etcd"
-    image: docker.io/wzshiming/etcd:v3.4.3
+    image: ${IMAGE_ETCD}
     restart: always
     command:
       - etcd
@@ -49,7 +106,7 @@ services:
 
   kube_apiserver:
     container_name: "${name}-kube-apiserver"
-    image: docker.io/wzshiming/kube-apiserver:v1.18.8
+    image: ${IMAGE_KUBE_APISERVER}
     restart: always
     ports:
       - ${port}:8080
@@ -72,7 +129,7 @@ services:
 
   kube_controller:
     container_name: "${name}-kube-controller"
-    image: docker.io/wzshiming/kube-controller-manager:v1.18.8
+    image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
     restart: always
     command:
       - kube-controller-manager
@@ -86,7 +143,7 @@ services:
 
   kube_scheduler:
     container_name: "${name}-kube-scheduler"
-    image: docker.io/wzshiming/kube-scheduler:v1.18.8
+    image: ${IMAGE_KUBE_SCHEDULER}
     restart: always
     command:
       - kube-scheduler
@@ -100,7 +157,7 @@ services:
 
   fake_kubelet:
     container_name: "${name}-fake-kubelet"
-    image: ghcr.io/wzshiming/fake-kubelet/fake-kubelet:v0.3.3
+    image: ${IMAGE_FAKE_KUBELET}
     restart: always
     command:
       - --kubeconfig
@@ -219,16 +276,27 @@ function list_cluster() {
 TMPDIR="${TMPDIR:-/tmp/}"
 
 function usage() {
+  init_global_flags
   echo "Usage $0"
   echo "Commands:"
   echo "  create    Creates one fake cluster"
   echo "  delete    Deletes one fake cluster"
   echo "  list      List all fake cluster"
   echo "Flags:"
-  echo "  -h, --help               show this help"
-  echo "  -n, --name string        cluster name (default: 'default')"
-  echo "  -r, --replicas uint32    number of replicas of the node (default: '5')"
-  echo "  -p, --port uint16        port of the apiserver of the cluster (default: '8080')"
+  echo "  -h, --help                             show this help"
+  echo "  -n, --name string                      cluster name (default: 'default')"
+  echo "  -r, --replicas uint32                  number of replicas of the node (default: '5')"
+  echo "  -p, --port uint16                      port of the apiserver of the cluster (default: '8080')"
+  echo "  --fake-version string                  version of the fake image (default: '${FAKE_VERSION}')"
+  echo "  --kube-version string                  version of the kubernetes image (default: '${KUBE_VERSION}')"
+  echo "  --etcd-version string                  version of the etcd image (default: '${ETCD_VERSION}')"
+  echo "  --kube-image-prefix string             prefix of the kubernetes image (default: '${KUBE_IMAGE_PREFIX}')"
+  echo "  --fake-image-prefix string             prefix of the fake image (default: '${FAKE_IMAGE_PREFIX}')"
+  echo "  --image-etcd string                    etcd image (default: '${IMAGE_ETCD}')"
+  echo "  --image-kube-apiserver string          kube-apiserver image (default: '${IMAGE_KUBE_APISERVER}')"
+  echo "  --image-kube-controller-manager string kube-controller-manager image (default: '${IMAGE_KUBE_CONTROLLER_MANAGER}')"
+  echo "  --image-kube-scheduler string          kube-scheduler image (default: '${IMAGE_KUBE_SCHEDULER}')"
+  echo "  --image-fake-kubelet string            fake-kubelet image (default: '${IMAGE_FAKE_KUBELET}')"
 }
 
 function main() {
@@ -254,6 +322,36 @@ function main() {
     -n | -n=* | --name | --name=*)
       [[ "${key#*=}" != "$key" ]] && name="${key#*=}" || { name="$2" && shift; }
       ;;
+    --fake-version | --fake-version=*)
+      [[ "${key#*=}" != "$key" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="$2" && shift; }
+      ;;
+    --kube-version | --kube-version=*)
+      [[ "${key#*=}" != "$key" ]] && KUBE_VERSION="${key#*=}" || { KUBE_VERSION="$2" && shift; }
+      ;;
+    --etcd-version | --etcd-version=*)
+      [[ "${key#*=}" != "$key" ]] && ETCD_VERSION="${key#*=}" || { ETCD_VERSION="$2" && shift; }
+      ;;
+    --kube-image-prefix | --kube-image-prefix=*)
+      [[ "${key#*=}" != "$key" ]] && KUBE_IMAGE_PREFIX="${key#*=}" || { KUBE_IMAGE_PREFIX="$2" && shift; }
+      ;;
+    --fake-image-prefix | --fake-image-prefix=*)
+      [[ "${key#*=}" != "$key" ]] && FAKE_IMAGE_PREFIX="${key#*=}" || { FAKE_IMAGE_PREFIX="$2" && shift; }
+      ;;
+    --image-etcd | --image-etcd=*)
+      [[ "${key#*=}" != "$key" ]] && IMAGE_ETCD="${key#*=}" || { IMAGE_ETCD="$2" && shift; }
+      ;;
+    --image-kube-apiserver | --image-kube-apiserver=*)
+      [[ "${key#*=}" != "$key" ]] && IMAGE_KUBE_APISERVER="${key#*=}" || { IMAGE_KUBE_APISERVER="$2" && shift; }
+      ;;
+    --image-kube-controller-manager | --image-kube-controller-manager=*)
+      [[ "${key#*=}" != "$key" ]] && IMAGE_KUBE_CONTROLLER_MANAGER="${key#*=}" || { IMAGE_KUBE_CONTROLLER_MANAGER="$2" && shift; }
+      ;;
+    --image-kube-scheduler | --image-kube-scheduler=*)
+      [[ "${key#*=}" != "$key" ]] && IMAGE_KUBE_SCHEDULER="${key#*=}" || { IMAGE_KUBE_SCHEDULER="$2" && shift; }
+      ;;
+    --image-fake-kubelet | --image-fake-kubelet=*)
+      [[ "${key#*=}" != "$key" ]] && IMAGE_FAKE_KUBELET="${key#*=}" || { IMAGE_FAKE_KUBELET="$2" && shift; }
+      ;;
     -h | --help)
       usage
       exit 0
@@ -269,6 +367,8 @@ function main() {
     usage
     return 1
   fi
+
+  init_global_flags
 
   local command="${args[0]}"
 

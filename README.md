@@ -72,10 +72,20 @@ Commands:
   delete    Deletes one fake cluster
   list      List all fake cluster
 Flags:
-  -h, --help               show this help
-  -n, --name string        cluster name (default: 'default')
-  -r, --replicas uint32    number of replicas of the node (default: '5')
-  -p, --port uint16        port of the apiserver of the cluster (default: '8080')
+  -h, --help                             show this help
+  -n, --name string                      cluster name (default: 'default')
+  -r, --replicas uint32                  number of replicas of the node (default: '5')
+  -p, --port uint16                      port of the apiserver of the cluster (default: '8080')
+  --fake-version string                  version of the fake image (default: 'v0.3.3')
+  --kube-version string                  version of the kubernetes image (default: 'v1.19.16')
+  --etcd-version string                  version of the etcd image (default: '3.4.13-0')
+  --kube-image-prefix string             prefix of the kubernetes image (default: 'k8s.gcr.io')
+  --fake-image-prefix string             prefix of the fake image (default: 'ghcr.io/wzshiming/fake-kubelet')
+  --image-etcd string                    etcd image (default: 'k8s.gcr.io/etcd:3.4.13-0')
+  --image-kube-apiserver string          kube-apiserver image (default: 'k8s.gcr.io/kube-apiserver:v1.19.16')
+  --image-kube-controller-manager string kube-controller-manager image (default: 'k8s.gcr.io/kube-controller-manager:v1.19.16')
+  --image-kube-scheduler string          kube-scheduler image (default: 'k8s.gcr.io/kube-scheduler:v1.19.16')
+  --image-fake-kubelet string            fake-kubelet image (default: 'ghcr.io/wzshiming/fake-kubelet/fake-kubelet:v0.3.3')
 ```
 
 ## Cteate cluster
