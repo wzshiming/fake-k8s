@@ -48,7 +48,7 @@ spec:
 EOF
 deployment.apps/fake-pod created
 
-$ kubectl --context=fake-k8s-default get pod
+$ kubectl --context=fake-k8s-default get pod -o wide
 NAME                        READY   STATUS    RESTARTS   AGE   IP          NODE     NOMINATED NODE   READINESS GATES
 fake-pod-794f9d7464-246z6   1/1     Running   0          1s    10.0.0.15   fake-3   <none>           <none>
 fake-pod-794f9d7464-2cvdk   1/1     Running   0          1s    10.0.0.19   fake-4   <none>           <none>
