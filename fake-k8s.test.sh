@@ -20,7 +20,7 @@ releases=(
 function test_release() {
   local release="${1}"
   local port="${2}"
-  local name="cluster-${release}"
+  local name="cluster-${release//./-}"
   ./fake-k8s.sh create --name "${name}" --port="${port}" --kube-version "${release}"
 
   for _ in $(seq 1 30); do
