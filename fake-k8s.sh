@@ -123,7 +123,7 @@ function build_compose_with_tls() {
 version: "3.1"
 services:
   etcd:
-    container_name: "${name}-etcd"
+    container_name: "${name}.etcd"
     image: ${IMAGE_ETCD}
     restart: always
     command:
@@ -144,7 +144,7 @@ services:
       - node0=http://0.0.0.0:2380
 
   kube_apiserver:
-    container_name: "${name}-kube-apiserver"
+    container_name: "${name}.kube-apiserver"
     image: ${IMAGE_KUBE_APISERVER}
     restart: always
     ports:
@@ -154,7 +154,7 @@ services:
       - --admission-control
       - ""
       - --etcd-servers
-      - http://${name}-etcd:2379
+      - http://${name}.etcd:2379
       - --etcd-prefix
       - /prefix/registry
       - --default-watch-cache-size
@@ -186,7 +186,7 @@ services:
         target: /etc/kubernetes/pki/ca.crt
 
   kube_controller:
-    container_name: "${name}-kube-controller"
+    container_name: "${name}.kube-controller"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
     restart: always
     command:
@@ -200,7 +200,7 @@ services:
         target: /root/.kube/config
 
   kube_scheduler:
-    container_name: "${name}-kube-scheduler"
+    container_name: "${name}.kube-scheduler"
     image: ${IMAGE_KUBE_SCHEDULER}
     restart: always
     command:
@@ -214,7 +214,7 @@ services:
         target: /root/.kube/config
 
   fake_kubelet:
-    container_name: "${name}-fake-kubelet"
+    container_name: "${name}.fake-kubelet"
     image: ${IMAGE_FAKE_KUBELET}
     restart: always
     command:
@@ -301,7 +301,7 @@ function build_compose() {
 version: "3.1"
 services:
   etcd:
-    container_name: "${name}-etcd"
+    container_name: "${name}.etcd"
     image: ${IMAGE_ETCD}
     restart: always
     command:
@@ -322,7 +322,7 @@ services:
       - node0=http://0.0.0.0:2380
 
   kube_apiserver:
-    container_name: "${name}-kube-apiserver"
+    container_name: "${name}.kube-apiserver"
     image: ${IMAGE_KUBE_APISERVER}
     restart: always
     ports:
@@ -332,7 +332,7 @@ services:
       - --admission-control
       - ""
       - --etcd-servers
-      - http://${name}-etcd:2379
+      - http://${name}.etcd:2379
       - --etcd-prefix
       - /prefix/registry
       - --insecure-bind-address
@@ -345,7 +345,7 @@ services:
       - etcd
 
   kube_controller:
-    container_name: "${name}-kube-controller"
+    container_name: "${name}.kube-controller"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
     restart: always
     command:
@@ -359,7 +359,7 @@ services:
         target: /root/.kube/config
 
   kube_scheduler:
-    container_name: "${name}-kube-scheduler"
+    container_name: "${name}.kube-scheduler"
     image: ${IMAGE_KUBE_SCHEDULER}
     restart: always
     command:
@@ -373,7 +373,7 @@ services:
         target: /root/.kube/config
 
   fake_kubelet:
-    container_name: "${name}-fake-kubelet"
+    container_name: "${name}.fake-kubelet"
     image: ${IMAGE_FAKE_KUBELET}
     restart: always
     command:
@@ -462,7 +462,7 @@ DNS.1 = kubernetes
 DNS.2 = kubernetes.default
 DNS.3 = kubernetes.default.svc
 DNS.4 = kubernetes.default.svc.cluster.local
-DNS.5 = ${name}-kube-apiserver
+DNS.5 = *.kube-apiserver
 IP.1 = 127.0.0.1
 EOF
   fi
@@ -523,7 +523,7 @@ function create_cluster() {
   local port="${2}"
   local replicas="${3}"
   local full_name="fake-k8s-${name}"
-  local pkidir="${TMPDIR}/fake-k8s/pki/${name}"
+  local pkidir="${TMPDIR}/fake-k8s/pki"
   local tmpdir="${TMPDIR}/fake-k8s/clusters/${name}"
   local kube_version
 
