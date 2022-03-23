@@ -64,8 +64,8 @@ function init_global_flags() {
   IMAGE_FAKE_KUBELET="${IMAGE_FAKE_KUBELET:-${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}}"
 }
 
-function incluster_kubeconfig_tls() {
-  local name="${1}"
+function build_kubeconfig_with_tls() {
+  local address="${1}"
   local admin_crt_path="${2}"
   local admin_key_path="${3}"
   local ca_crt_path="${4}"
@@ -73,33 +73,33 @@ function incluster_kubeconfig_tls() {
 apiVersion: v1
 kind: Config
 preferences: {}
-current-context: ${name}
+current-context: fake-k8s
 clusters:
   - cluster:
-      server: https://${name}-kube-apiserver:6443
+      server: ${address}
       certificate-authority-data: $(cat ${ca_crt_path} | base64 | tr -d '\n')
-    name: ${name}
+    name: fake-k8s
 contexts:
   - context:
-      cluster: ${name}
-      user: ${name}
-    name: ${name}
+      cluster: fake-k8s
+      user: fake-k8s
+    name: fake-k8s
 users:
-  - name: ${name}
+  - name: fake-k8s
     user:
       client-certificate-data: $(cat ${admin_crt_path} | base64 | tr -d '\n')
       client-key-data: $(cat ${admin_key_path} | base64 | tr -d '\n')
 EOF
 }
 
-function incluster_kubeconfig() {
-  local name="${1}"
+function build_kubeconfig() {
+  local address="${1}"
   cat <<EOF
 apiVersion: v1
 kind: Config
 clusters:
   - cluster:
-      server: http://${name}-kube-apiserver:8080
+      server: "${address}"
     name: test
 contexts:
   - context:
@@ -110,7 +110,7 @@ preferences: {}
 EOF
 }
 
-function docker_compose_file_tls() {
+function build_compose_with_tls() {
   local name="${1}"
   local port="${2}"
   local replicas="${3}"
@@ -292,7 +292,7 @@ networks:
 EOF
 }
 
-function docker_compose_file() {
+function build_compose() {
   local name="${1}"
   local port="${2}"
   local replicas="${3}"
@@ -487,7 +487,7 @@ EOF
   fi
 }
 
-function set_default_kubeconfig_tls() {
+function set_default_kubeconfig_with_tls() {
   local name="${1}"
   local port="${2}"
   local admin_crt_path="${3}"
@@ -523,36 +523,48 @@ function create_cluster() {
   local port="${2}"
   local replicas="${3}"
   local full_name="fake-k8s-${name}"
-  local tmpdir="${TMPDIR}/fake-k8s/${name}"
+  local pkidir="${TMPDIR}/fake-k8s/pki/${name}"
+  local tmpdir="${TMPDIR}/fake-k8s/clusters/${name}"
   local kube_version
 
   kube_version="$(get_release_version "${KUBE_VERSION}")"
   mkdir -p "${tmpdir}"
 
   if [[ "${kube_version}" -ge "20" ]]; then
-    gen_cert "${full_name}" "${tmpdir}"
+    mkdir -p "${pkidir}"
+    gen_cert "${full_name}" "${pkidir}"
 
-    incluster_kubeconfig_tls "${full_name}" "${tmpdir}/admin.crt" "${tmpdir}/admin.key" "${tmpdir}/ca.crt" >"${tmpdir}/kubeconfig"
-    docker_compose_file_tls "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" "${tmpdir}/admin.crt" "${tmpdir}/admin.key" "${tmpdir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
+    build_kubeconfig_with_tls "https://${full_name}-kube-apiserver:6443" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig"
+    build_compose_with_tls "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
   else
-    incluster_kubeconfig "${full_name}" >"${tmpdir}/kubeconfig"
-    docker_compose_file "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
+    build_kubeconfig "http://${full_name}-kube-apiserver:8080" >"${tmpdir}/kubeconfig"
+    build_compose "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
   fi
 
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
-  if [[ "${kube_version}" -ge "20" ]]; then
-    set_default_kubeconfig_tls "${full_name}" "${port}" "${tmpdir}/admin.crt" "${tmpdir}/admin.key" "${tmpdir}/ca.crt"
-  else
-    set_default_kubeconfig "${full_name}" "${port}"
-  fi
+  if command_exist kubectl; then
+    if [[ "${kube_version}" -ge "20" ]]; then
+      set_default_kubeconfig_with_tls "${full_name}" "${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt"
+    else
+      set_default_kubeconfig "${full_name}" "${port}"
+    fi
 
-  echo "kubectl --context=${full_name} get node"
-  for i in $(seq 1 10); do
-    kubectl --context="${full_name}" get node >/dev/null 2>&1 && break
-    sleep 1
-  done
-  kubectl --context="${full_name}" get node
+    echo "kubectl --context=${full_name} get node"
+    for i in $(seq 1 10); do
+      kubectl --context="${full_name}" get node >/dev/null 2>&1 && break
+      sleep 1
+    done
+    kubectl --context="${full_name}" get node
+  else
+    if [[ "${kube_version}" -ge "20" ]]; then
+      build_kubeconfig_with_tls "https://127.0.0.1:${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig.yaml"
+    else
+      build_kubeconfig "http://127.0.0.1:${port}" >"${tmpdir}/kubeconfig.yaml"
+    fi
+
+    echo "Output kubeconfig.yaml to ${tmpdir}/kubeconfig.yaml"
+  fi
   echo "Created cluster ${full_name}."
 }
 
@@ -562,9 +574,11 @@ function delete_cluster() {
   local tmpdir="${TMPDIR}/fake-k8s/${name}"
   local full_name="fake-k8s-${name}"
 
-  kubectl config delete-context "${full_name}"
-  kubectl config delete-cluster "${full_name}"
-  kubectl config delete-user "${full_name}"
+  if command_exist kubectl; then
+    kubectl config delete-context "${full_name}"
+    kubectl config delete-cluster "${full_name}"
+    kubectl config delete-user "${full_name}"
+  fi
 
   if [[ -f "${tmpdir}/docker-compose.yaml" ]]; then
     "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" kill
