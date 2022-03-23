@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+function command_exist() {
+  local command="${1}"
+  type "${command}" >/dev/null 2>&1
+}
+
 declare -A etcd_versions=(
   ["8"]="3.0.17"
   ["9"]="3.1.12"
@@ -44,6 +49,8 @@ function get_etcd_version() {
 }
 
 function init_global_flags() {
+  RUNTIME="${RUNTIME:-$(detection_runtime)}"
+
   FAKE_VERSION="${FAKE_VERSION:-v0.3.3}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
@@ -501,6 +508,16 @@ function set_default_kubeconfig() {
   kubectl config set "contexts.${name}.cluster" "${name}"
 }
 
+function detection_runtime() {
+  if command_exist docker; then
+    echo docker
+  elif command_exist nerdctl; then
+    echo nerdctl
+  else
+    echo docker
+  fi
+}
+
 function create_cluster() {
   local name="${1}"
   local port="${2}"
@@ -522,7 +539,7 @@ function create_cluster() {
     docker_compose_file "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
   fi
 
-  docker compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
   if [[ "${kube_version}" -ge "20" ]]; then
     set_default_kubeconfig_tls "${full_name}" "${port}" "${tmpdir}/admin.crt" "${tmpdir}/admin.key" "${tmpdir}/ca.crt"
@@ -541,13 +558,20 @@ function create_cluster() {
 
 function delete_cluster() {
   local name="${1}"
+
+  local tmpdir="${TMPDIR}/fake-k8s/${name}"
   local full_name="fake-k8s-${name}"
 
   kubectl config delete-context "${full_name}"
   kubectl config delete-cluster "${full_name}"
   kubectl config delete-user "${full_name}"
 
-  docker compose -p "${full_name}" down
+  if [[ -f "${tmpdir}/docker-compose.yaml" ]]; then
+    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" kill
+    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" down
+  else
+    "${RUNTIME}" compose -p "${full_name}" down
+  fi
 
   echo "Deleted cluster ${full_name}."
 }
@@ -570,6 +594,7 @@ function usage() {
   echo "  -n, --name string                      cluster name (default: 'default')"
   echo "  -r, --replicas uint32                  number of replicas of the node (default: '5')"
   echo "  -p, --port uint16                      port of the apiserver of the cluster (default: '8080')"
+  echo "  --runtime string                       runtime to use (default: '${RUNTIME}')"
   echo "  --fake-version string                  version of the fake image (default: '${FAKE_VERSION}')"
   echo "  --kube-version string                  version of the kubernetes image (default: '${KUBE_VERSION}')"
   echo "  --etcd-version string                  version of the etcd image (default: '${ETCD_VERSION}')"
@@ -604,6 +629,9 @@ function main() {
       ;;
     -n | -n=* | --name | --name=*)
       [[ "${key#*=}" != "$key" ]] && name="${key#*=}" || { name="$2" && shift; }
+      ;;
+    --runtime | --runtime=*)
+      [[ "${key#*=}" != "$key" ]] && RUNTIME="${key#*=}" || { RUNTIME="$2" && shift; }
       ;;
     --fake-version | --fake-version=*)
       [[ "${key#*=}" != "$key" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="$2" && shift; }
