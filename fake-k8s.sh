@@ -280,8 +280,7 @@ configs:
 
 networks:
   default:
-    external:
-      name: ${name}
+    name: ${name}
 
 EOF
 }
@@ -434,9 +433,7 @@ configs:
 
 networks:
   default:
-    external:
-      name: ${name}
-
+    name: ${name}
 EOF
 }
 
@@ -525,8 +522,6 @@ function create_cluster() {
     docker_compose_file "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
   fi
 
-  docker network create "${full_name}"
-
   docker compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
   if [[ "${kube_version}" -ge "20" ]]; then
@@ -548,13 +543,11 @@ function delete_cluster() {
   local name="${1}"
   local full_name="fake-k8s-${name}"
 
-  docker compose -p "${full_name}" down
-
-  docker network rm "${full_name}"
-
   kubectl config delete-context "${full_name}"
   kubectl config delete-cluster "${full_name}"
   kubectl config delete-user "${full_name}"
+
+  docker compose -p "${full_name}" down
 
   echo "Deleted cluster ${full_name}."
 }
