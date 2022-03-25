@@ -64,7 +64,7 @@ function init_global_flags() {
   IMAGE_FAKE_KUBELET="${IMAGE_FAKE_KUBELET:-${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}}"
 }
 
-function build_kubeconfig_with_tls() {
+function build_kubeconfig() {
   local address="${1}"
   local admin_crt_path="${2}"
   local admin_key_path="${3}"
@@ -75,42 +75,34 @@ kind: Config
 preferences: {}
 current-context: fake-k8s
 clusters:
-  - cluster:
+  - name: fake-k8s
+    cluster:
       server: ${address}
+EOF
+  if [[ "${admin_key_path}" != "" ]]; then
+    cat <<EOF
       certificate-authority-data: $(cat ${ca_crt_path} | base64 | tr -d '\n')
-    name: fake-k8s
+EOF
+  fi
+  cat <<EOF
 contexts:
-  - context:
+  - name: fake-k8s
+    context:
       cluster: fake-k8s
+EOF
+  if [[ "${admin_key_path}" != "" ]]; then
+    cat <<EOF
       user: fake-k8s
-    name: fake-k8s
 users:
   - name: fake-k8s
     user:
       client-certificate-data: $(cat ${admin_crt_path} | base64 | tr -d '\n')
       client-key-data: $(cat ${admin_key_path} | base64 | tr -d '\n')
 EOF
+  fi
 }
 
-function build_kubeconfig() {
-  local address="${1}"
-  cat <<EOF
-apiVersion: v1
-kind: Config
-clusters:
-  - cluster:
-      server: "${address}"
-    name: test
-contexts:
-  - context:
-      cluster: test
-    name: test
-current-context: test
-preferences: {}
-EOF
-}
-
-function build_compose_with_tls() {
+function build_compose() {
   local name="${1}"
   local port="${2}"
   local replicas="${3}"
@@ -147,8 +139,22 @@ services:
     container_name: "${name}-kube-apiserver"
     image: ${IMAGE_KUBE_APISERVER}
     restart: always
+    links:
+      - etcd
     ports:
+EOF
+
+  if [[ "${admin_key_path}" != "" ]]; then
+    cat <<EOF
       - ${port}:6443
+EOF
+  else
+    cat <<EOF
+      - ${port}:8080
+EOF
+  fi
+
+  cat <<EOF
     command:
       - kube-apiserver
       - --admission-control
@@ -159,6 +165,10 @@ services:
       - /prefix/registry
       - --default-watch-cache-size
       - "10000"
+EOF
+
+  if [[ "${admin_key_path}" != "" ]]; then
+    cat <<EOF
       - --bind-address
       - 0.0.0.0
       - --secure-port
@@ -175,8 +185,6 @@ services:
       - /etc/kubernetes/pki/apiserver.key
       - --service-account-issuer
       - https://kubernetes.default.svc.cluster.local
-    links:
-      - etcd
     configs:
       - source: admin-crt
         target: /etc/kubernetes/pki/apiserver.crt
@@ -184,7 +192,17 @@ services:
         target: /etc/kubernetes/pki/apiserver.key
       - source: ca-crt
         target: /etc/kubernetes/pki/ca.crt
+EOF
+  else
+    cat <<EOF
+      - --insecure-bind-address
+      - 0.0.0.0
+      - --insecure-port
+      - "8080"
+EOF
+  fi
 
+  cat <<EOF
   kube_controller:
     container_name: "${name}-kube-controller"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
@@ -274,170 +292,22 @@ services:
           osImage: ""
           systemUUID: ""
         phase: Running
-
 configs:
   kubeconfig:
     file: ${kubeconfig_path}
+EOF
+
+  if [[ "${admin_key_path}" != "" ]]; then
+    cat <<EOF
   admin-crt:
     file: ${admin_crt_path}
   admin-key:
     file: ${admin_key_path}
   ca-crt:
     file: ${ca_crt_path}
-
-networks:
-  default:
-    name: ${name}
-
 EOF
-}
-
-function build_compose() {
-  local name="${1}"
-  local port="${2}"
-  local replicas="${3}"
-  local kubeconfig_path="${4}"
+  fi
   cat <<EOF
-version: "3.1"
-services:
-  etcd:
-    container_name: "${name}-etcd"
-    image: ${IMAGE_ETCD}
-    restart: always
-    command:
-      - etcd
-      - --data-dir
-      - /etcd-data
-      - --name
-      - node0
-      - --initial-advertise-peer-urls
-      - http://0.0.0.0:2380
-      - --listen-peer-urls
-      - http://0.0.0.0:2380
-      - --advertise-client-urls
-      - http://0.0.0.0:2379
-      - --listen-client-urls
-      - http://0.0.0.0:2379
-      - --initial-cluster
-      - node0=http://0.0.0.0:2380
-
-  kube_apiserver:
-    container_name: "${name}-kube-apiserver"
-    image: ${IMAGE_KUBE_APISERVER}
-    restart: always
-    ports:
-      - ${port}:8080
-    command:
-      - kube-apiserver
-      - --admission-control
-      - ""
-      - --etcd-servers
-      - http://${name}-etcd:2379
-      - --etcd-prefix
-      - /prefix/registry
-      - --insecure-bind-address
-      - 0.0.0.0
-      - --insecure-port
-      - "8080"
-      - --default-watch-cache-size
-      - "10000"
-    links:
-      - etcd
-
-  kube_controller:
-    container_name: "${name}-kube-controller"
-    image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
-    restart: always
-    command:
-      - kube-controller-manager
-      - --kubeconfig
-      - /root/.kube/config
-    links:
-      - kube_apiserver
-    configs:
-      - source: kubeconfig
-        target: /root/.kube/config
-
-  kube_scheduler:
-    container_name: "${name}-kube-scheduler"
-    image: ${IMAGE_KUBE_SCHEDULER}
-    restart: always
-    command:
-      - kube-scheduler
-      - --kubeconfig
-      - /root/.kube/config
-    links:
-      - kube_apiserver
-    configs:
-      - source: kubeconfig
-        target: /root/.kube/config
-
-  fake_kubelet:
-    container_name: "${name}-fake-kubelet"
-    image: ${IMAGE_FAKE_KUBELET}
-    restart: always
-    command:
-      - --kubeconfig
-      - /root/.kube/config
-    links:
-      - kube_apiserver
-    configs:
-      - source: kubeconfig
-        target: /root/.kube/config
-    environment:
-      NODE_NAME: ""
-      GENERATE_NODE_NAME: fake-
-      GENERATE_REPLICAS: "${replicas}"
-      CIDR: 10.0.0.1/24
-      NODE_TEMPLATE: |-
-        apiVersion: v1
-        kind: Node
-        metadata:
-          annotations:
-            node.alpha.kubernetes.io/ttl: "0"
-          labels:
-            app: fake-kubelet
-            beta.kubernetes.io/arch: amd64
-            beta.kubernetes.io/os: linux
-            kubernetes.io/arch: amd64
-            kubernetes.io/hostname: {{ .metadata.name }}
-            kubernetes.io/os: linux
-            kubernetes.io/role: agent
-            node-role.kubernetes.io/agent: ""
-            type: fake-kubelet
-          name: {{ .metadata.name }}
-      NODE_INITIALIZATION_TEMPLATE: |-
-        addresses:
-        - address: {{ NodeIP }}
-          type: InternalIP
-        allocatable:
-          cpu: 1k
-          memory: 1Ti
-          pods: 1M
-        capacity:
-          cpu: 1k
-          memory: 1Ti
-          pods: 1M
-        daemonEndpoints:
-          kubeletEndpoint:
-            Port: 0
-        nodeInfo:
-          architecture: amd64
-          bootID: ""
-          containerRuntimeVersion: ""
-          kernelVersion: ""
-          kubeProxyVersion: ""
-          kubeletVersion: fake
-          machineID: ""
-          operatingSystem: Linux
-          osImage: ""
-          systemUUID: ""
-        phase: Running
-
-configs:
-  kubeconfig:
-    file: ${kubeconfig_path}
-
 networks:
   default:
     name: ${name}
@@ -487,25 +357,36 @@ EOF
   fi
 }
 
-function set_default_kubeconfig_with_tls() {
+function set_default_kubeconfig() {
   local name="${1}"
   local port="${2}"
   local admin_crt_path="${3}"
   local admin_key_path="${4}"
   local ca_crt_path="${5}"
-  kubectl config set "clusters.${name}.server" "https://127.0.0.1:${port}"
-  kubectl config set "clusters.${name}.certificate-authority-data" "$(cat "${ca_crt_path}" | base64 | tr -d '\n')"
-  kubectl config set "contexts.${name}.cluster" "${name}"
-  kubectl config set "contexts.${name}.user" "${name}"
-  kubectl config set "users.${name}.client-certificate-data" "$(cat "${admin_crt_path}" | base64 | tr -d '\n')"
-  kubectl config set "users.${name}.client-key-data" "$(cat "${admin_key_path}" | base64 | tr -d '\n')"
+
+  if [[ "${admin_key_path}" != "" ]]; then
+    kubectl config set "clusters.${name}.server" "https://127.0.0.1:${port}"
+    kubectl config set "clusters.${name}.certificate-authority-data" "$(cat "${ca_crt_path}" | base64 | tr -d '\n')"
+    kubectl config set "contexts.${name}.cluster" "${name}"
+    kubectl config set "contexts.${name}.user" "${name}"
+    kubectl config set "users.${name}.client-certificate-data" "$(cat "${admin_crt_path}" | base64 | tr -d '\n')"
+    kubectl config set "users.${name}.client-key-data" "$(cat "${admin_key_path}" | base64 | tr -d '\n')"
+  else
+    kubectl config set "clusters.${name}.server" "http://127.0.0.1:${port}"
+    kubectl config set "contexts.${name}.cluster" "${name}"
+  fi
 }
 
-function set_default_kubeconfig() {
+function unset_default_kubeconfig() {
   local name="${1}"
-  local port="${2}"
-  kubectl config set "clusters.${name}.server" "http://127.0.0.1:${port}"
-  kubectl config set "contexts.${name}.cluster" "${name}"
+  kubectl config delete-context "${name}"
+  kubectl config delete-cluster "${name}"
+  kubectl config delete-user "${name}"
+}
+
+function is_tls() {
+  local kube_version="${1}"
+  [[ "${kube_version}" -ge "20" ]]
 }
 
 function detection_runtime() {
@@ -530,12 +411,12 @@ function create_cluster() {
   kube_version="$(get_release_version "${KUBE_VERSION}")"
   mkdir -p "${tmpdir}"
 
-  if [[ "${kube_version}" -ge "20" ]]; then
+  if is_tls "${kube_version}"; then
     mkdir -p "${pkidir}"
     gen_cert "${full_name}" "${pkidir}"
 
-    build_kubeconfig_with_tls "https://${full_name}-kube-apiserver:6443" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig"
-    build_compose_with_tls "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
+    build_kubeconfig "https://${full_name}-kube-apiserver:6443" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig"
+    build_compose "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
   else
     build_kubeconfig "http://${full_name}-kube-apiserver:8080" >"${tmpdir}/kubeconfig"
     build_compose "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
@@ -544,8 +425,8 @@ function create_cluster() {
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
   if command_exist kubectl; then
-    if [[ "${kube_version}" -ge "20" ]]; then
-      set_default_kubeconfig_with_tls "${full_name}" "${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt"
+    if is_tls "${kube_version}"; then
+      set_default_kubeconfig "${full_name}" "${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt"
     else
       set_default_kubeconfig "${full_name}" "${port}"
     fi
@@ -557,8 +438,8 @@ function create_cluster() {
     done
     kubectl --context="${full_name}" get node
   else
-    if [[ "${kube_version}" -ge "20" ]]; then
-      build_kubeconfig_with_tls "https://127.0.0.1:${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig.yaml"
+    if is_tls "${kube_version}"; then
+      build_kubeconfig "https://127.0.0.1:${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig.yaml"
     else
       build_kubeconfig "http://127.0.0.1:${port}" >"${tmpdir}/kubeconfig.yaml"
     fi
@@ -575,9 +456,7 @@ function delete_cluster() {
   local full_name="fake-k8s-${name}"
 
   if command_exist kubectl; then
-    kubectl config delete-context "${full_name}"
-    kubectl config delete-cluster "${full_name}"
-    kubectl config delete-user "${full_name}"
+    unset_default_kubeconfig "${full_name}"
   fi
 
   if [[ -f "${tmpdir}/docker-compose.yaml" ]]; then
