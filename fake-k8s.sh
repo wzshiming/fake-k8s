@@ -591,7 +591,7 @@ function delete_cluster() {
 }
 
 function list_cluster() {
-  docker compose ls --all --filter=name=fake-k8s-
+  "${RUNTIME}" compose ls --all --filter=name=fake-k8s-
 }
 
 TMPDIR="${TMPDIR:-/tmp/}"
