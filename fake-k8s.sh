@@ -452,7 +452,7 @@ function create_cluster() {
 function delete_cluster() {
   local name="${1}"
 
-  local tmpdir="${TMPDIR}/fake-k8s/${name}"
+  local tmpdir="${TMPDIR}/fake-k8s/clusters/${name}"
   local full_name="fake-k8s-${name}"
 
   if command_exist kubectl; then
