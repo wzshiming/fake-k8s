@@ -482,8 +482,8 @@ function create_cluster() {
   local name="${1}"
   local port="${2}"
   local full_name="fake-k8s-${name}"
-  local pkidir="${TMPDIR}/fake-k8s/pki/${name}"
-  local tmpdir="${TMPDIR}/fake-k8s/clusters/${name}"
+  local pkidir="${TMPDIR}/pki/${name}"
+  local tmpdir="${TMPDIR}/clusters/${name}"
   local kube_version
 
   kube_version="$(get_release_version "${KUBE_VERSION}")"
@@ -547,7 +547,7 @@ function create_cluster() {
 function delete_cluster() {
   local name="${1}"
 
-  local tmpdir="${TMPDIR}/fake-k8s/clusters/${name}"
+  local tmpdir="${TMPDIR}/clusters/${name}"
   local full_name="fake-k8s-${name}"
 
   if command_exist kubectl; then
@@ -561,14 +561,26 @@ function delete_cluster() {
     "${RUNTIME}" compose -p "${full_name}" down
   fi
 
+  rm -rf "${tmpdir}"
   echo "Deleted cluster ${full_name}."
 }
 
 function list_cluster() {
-  "${RUNTIME}" compose ls --all --filter=name=fake-k8s-
+  for file in "${TMPDIR}"/clusters/*/kubeconfig.yaml; do
+    echo "${file}" | grep -o -e "/\([^/]\+\)/kubeconfig\.yaml$" | sed "s|/kubeconfig.yaml$||" | sed "s|^/||"
+  done
 }
 
-TMPDIR="${TMPDIR:-/tmp/}"
+function images() {
+  echo "${IMAGE_ETCD}"
+  echo "${IMAGE_KUBE_APISERVER}"
+  echo "${IMAGE_KUBE_CONTROLLER_MANAGER}"
+  echo "${IMAGE_KUBE_SCHEDULER}"
+  echo "${IMAGE_FAKE_KUBELET}"
+}
+
+TMPDIR="${TMPDIR:-/tmp}/fake-k8s"
+TMPDIR="${TMPDIR//\/\//\/}"
 
 function usage() {
   init_global_flags
@@ -577,6 +589,7 @@ function usage() {
   echo "  create    Creates one fake cluster"
   echo "  delete    Deletes one fake cluster"
   echo "  list      List all fake cluster"
+  echo "  images    List all images used by fake cluster"
   echo "Flags:"
   echo "  -h, --help                                 show this help"
   echo "  -n, --name string                          cluster name (default: 'default')"
@@ -691,6 +704,9 @@ function main() {
     ;;
   "list")
     list_cluster
+    ;;
+  "images")
+    images
     ;;
   *)
     usage
