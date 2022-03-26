@@ -16,3 +16,11 @@ jobs:
 
       - name: Run test
         run: ./fake-k8s.test.sh
+
+  mock-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run mock test
+        run: ./fake-k8s.mock.test.sh
