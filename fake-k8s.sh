@@ -51,7 +51,7 @@ function get_etcd_version() {
 function init_global_flags() {
   RUNTIME="${RUNTIME:-$(detection_runtime)}"
 
-  FAKE_VERSION="${FAKE_VERSION:-v0.3.3}"
+  FAKE_VERSION="${FAKE_VERSION:-v0.3.4}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
 
