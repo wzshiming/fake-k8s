@@ -51,6 +51,22 @@ function get_etcd_version() {
 function init_global_flags() {
   RUNTIME="${RUNTIME:-$(detection_runtime)}"
 
+  MOCK_FILENAME="${MOCK_FILENAME:-}"
+  if [[ "${MOCK_FILENAME}" != "" ]]; then
+    if [[ "${MOCK_FILENAME}" == "-" ]]; then
+      MOCK_CONTENT="$(jq '.items')"
+    else
+      MOCK_CONTENT="$(cat "${MOCK_FILENAME}" | jq '.items')"
+    fi
+    NODE_NAME="${NODE_NAME:-$(echo "${MOCK_CONTENT}" | jq -r '.[] | select( .kind == "Node" ) | .metadata.name' | tr '\n' ',' | sed 's/,$//')}"
+    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-}"
+    GENERATE_REPLICAS="${GENERATE_REPLICAS:-0}"
+  else
+    NODE_NAME="${NODE_NAME:-}"
+    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
+    GENERATE_REPLICAS="${GENERATE_REPLICAS:-5}"
+  fi
+
   FAKE_VERSION="${FAKE_VERSION:-v0.3.4}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
@@ -105,7 +121,7 @@ EOF
 function build_compose() {
   local name="${1}"
   local port="${2}"
-  local replicas="${3}"
+  local works="${3}"
   local kubeconfig_path="${4}"
   local admin_crt_path="${5}"
   local admin_key_path="${6}"
@@ -165,6 +181,7 @@ EOF
       - /prefix/registry
       - --default-watch-cache-size
       - "10000"
+      - --allow-privileged
 EOF
 
   if [[ "${admin_key_path}" != "" ]]; then
@@ -202,7 +219,8 @@ EOF
 EOF
   fi
 
-  cat <<EOF
+  if [[ "${works}" == "true" ]]; then
+    cat <<EOF
   kube_controller:
     container_name: "${name}-kube-controller"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
@@ -216,7 +234,10 @@ EOF
     configs:
       - source: kubeconfig
         target: /root/.kube/config
+EOF
+  fi
 
+  cat <<EOF
   kube_scheduler:
     container_name: "${name}-kube-scheduler"
     image: ${IMAGE_KUBE_SCHEDULER}
@@ -244,9 +265,9 @@ EOF
       - source: kubeconfig
         target: /root/.kube/config
     environment:
-      NODE_NAME: ""
-      GENERATE_NODE_NAME: fake-
-      GENERATE_REPLICAS: "${replicas}"
+      NODE_NAME: "${NODE_NAME}"
+      GENERATE_NODE_NAME: "${GENERATE_NODE_NAME}"
+      GENERATE_REPLICAS: "${GENERATE_REPLICAS}"
       CIDR: 10.0.0.1/24
       NODE_TEMPLATE: |-
         apiVersion: v1
@@ -399,10 +420,67 @@ function detection_runtime() {
   fi
 }
 
+function get_resource_kind() {
+  local api_version="${1}"
+  local kind="${2}"
+  if [[ "${api_version}" =~ / ]]; then
+    echo "${kind}.${api_version%%/*}"
+  else
+    echo "${kind}"
+  fi
+}
+
+function mock_cluster() {
+  local recover="${1}"
+  local kubeconfig="${2}"
+  local resource
+  local resource_name
+  local resource_namespace
+  local resource_uid
+  local resource_kind
+  local resource_version
+  local new_resource
+  local new_resource_uid
+
+  while true; do
+    resource="$(cat "${recover}" | jq '.[0]')"
+    resource_name="$(echo "${resource}" | jq -r '.metadata.name // ""')"
+    if [[ "${resource_name}" = "" ]]; then
+      break
+    fi
+    resource_namespace="$(echo "${resource}" | jq -r '.metadata.namespace // ""')"
+    resource_uid="$(echo "${resource}" | jq -r '.metadata.uid // ""')"
+    resource_kind="$(echo "${resource}" | jq -r '.kind // ""')"
+    resource_version="$(echo "${resource}" | jq -r '.apiVersion // ""')"
+    resource_kind=$(get_resource_kind "${resource_version}" "${resource_kind}")
+
+    cat "${recover}" | jq '.[1:]' >"${recover}.tmp"
+    mv "${recover}.tmp" "${recover}"
+
+    if [[ "${resource_kind}" == "Namespace" ]]; then
+      case "${resource_name}" in
+      kube-public | kube-node-lease | kube-system | default)
+        continue
+        ;;
+      *)
+        :
+        ;;
+      esac
+    fi
+
+    echo "${resource}" | kubectl --kubeconfig="${kubeconfig}" apply --force -f -
+    if grep "\"${resource_uid}\"" "${recover}" >/dev/null; then
+      new_resource=$(kubectl --kubeconfig="${kubeconfig}" get "${resource_kind}" -n "${resource_namespace}" "${resource_name}" -o json)
+      new_resource_uid="$(echo "${new_resource}" | jq -r '.metadata.uid // ""')"
+      cat "${recover}" | sed "s|\"${resource_uid}\"|\"${new_resource_uid}\"|g" >"${recover}.tmp"
+      mv "${recover}.tmp" "${recover}"
+    fi
+  done
+}
+
 function create_cluster() {
   local name="${1}"
   local port="${2}"
-  local replicas="${3}"
   local full_name="fake-k8s-${name}"
   local pkidir="${TMPDIR}/fake-k8s/pki/${name}"
   local tmpdir="${TMPDIR}/fake-k8s/clusters/${name}"
@@ -416,13 +494,38 @@ function create_cluster() {
     gen_cert "${full_name}" "${pkidir}"
 
     build_kubeconfig "https://${full_name}-kube-apiserver:6443" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig"
-    build_compose "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
   else
     build_kubeconfig "http://${full_name}-kube-apiserver:8080" >"${tmpdir}/kubeconfig"
-    build_compose "${full_name}" "${port}" "${replicas}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
   fi
 
-  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+  if is_tls "${kube_version}"; then
+    build_kubeconfig "https://127.0.0.1:${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig.yaml"
+  else
+    build_kubeconfig "http://127.0.0.1:${port}" >"${tmpdir}/kubeconfig.yaml"
+  fi
+
+  echo "Output kubeconfig.yaml to ${tmpdir}/kubeconfig.yaml"
+
+  if [[ "${MOCK_CONTENT}" != "" ]]; then
+    if is_tls "${kube_version}"; then
+      build_compose "${full_name}" "${port}" "false" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
+    else
+      build_compose "${full_name}" "${port}" "false" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
+    fi
+    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d --remove-orphans
+
+    echo "${MOCK_CONTENT}" >"${tmpdir}/origin-recover.json"
+    cp "${tmpdir}/origin-recover.json" "${tmpdir}/recover.json"
+    mock_cluster "${tmpdir}/recover.json" "${tmpdir}/kubeconfig.yaml"
+  fi
+
+  if is_tls "${kube_version}"; then
+    build_compose "${full_name}" "${port}" "true" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
+  else
+    build_compose "${full_name}" "${port}" "true" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
+  fi
+
+  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d --no-recreate
 
   if command_exist kubectl; then
     if is_tls "${kube_version}"; then
@@ -437,14 +540,6 @@ function create_cluster() {
       sleep 1
     done
     kubectl --context="${full_name}" get node
-  else
-    if is_tls "${kube_version}"; then
-      build_kubeconfig "https://127.0.0.1:${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig.yaml"
-    else
-      build_kubeconfig "http://127.0.0.1:${port}" >"${tmpdir}/kubeconfig.yaml"
-    fi
-
-    echo "Output kubeconfig.yaml to ${tmpdir}/kubeconfig.yaml"
   fi
   echo "Created cluster ${full_name}."
 }
@@ -483,21 +578,24 @@ function usage() {
   echo "  delete    Deletes one fake cluster"
   echo "  list      List all fake cluster"
   echo "Flags:"
-  echo "  -h, --help                             show this help"
-  echo "  -n, --name string                      cluster name (default: 'default')"
-  echo "  -r, --replicas uint32                  number of replicas of the node (default: '5')"
-  echo "  -p, --port uint16                      port of the apiserver of the cluster (default: '8080')"
-  echo "  --runtime string                       runtime to use (default: '${RUNTIME}')"
-  echo "  --fake-version string                  version of the fake image (default: '${FAKE_VERSION}')"
-  echo "  --kube-version string                  version of the kubernetes image (default: '${KUBE_VERSION}')"
-  echo "  --etcd-version string                  version of the etcd image (default: '${ETCD_VERSION}')"
-  echo "  --kube-image-prefix string             prefix of the kubernetes image (default: '${KUBE_IMAGE_PREFIX}')"
-  echo "  --fake-image-prefix string             prefix of the fake image (default: '${FAKE_IMAGE_PREFIX}')"
-  echo "  --image-etcd string                    etcd image (default: '${IMAGE_ETCD}')"
-  echo "  --image-kube-apiserver string          kube-apiserver image (default: '${IMAGE_KUBE_APISERVER}')"
-  echo "  --image-kube-controller-manager string kube-controller-manager image (default: '${IMAGE_KUBE_CONTROLLER_MANAGER}')"
-  echo "  --image-kube-scheduler string          kube-scheduler image (default: '${IMAGE_KUBE_SCHEDULER}')"
-  echo "  --image-fake-kubelet string            fake-kubelet image (default: '${IMAGE_FAKE_KUBELET}')"
+  echo "  -h, --help                                 show this help"
+  echo "  -n, --name string                          cluster name (default: 'default')"
+  echo "  -p, --port uint16                          port of the apiserver of the cluster (default: '8080')"
+  echo "  -r, --replicas, --generate-replicas uint32 number of replicas of the node (default: '${GENERATE_REPLICAS}')"
+  echo "  --mock string                              mock specifies the cluster from file (default: '${MOCK_FILENAME}')"
+  echo "  --generate-node-name string                generate node name (default: '${GENERATE_NODE_NAME}')"
+  echo "  --node-name strings                        extra node name (default: '${NODE_NAME}')"
+  echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
+  echo "  --fake-version string                      version of the fake image (default: '${FAKE_VERSION}')"
+  echo "  --kube-version string                      version of the kubernetes image (default: '${KUBE_VERSION}')"
+  echo "  --etcd-version string                      version of the etcd image (default: '${ETCD_VERSION}')"
+  echo "  --kube-image-prefix string                 prefix of the kubernetes image (default: '${KUBE_IMAGE_PREFIX}')"
+  echo "  --fake-image-prefix string                 prefix of the fake image (default: '${FAKE_IMAGE_PREFIX}')"
+  echo "  --image-etcd string                        etcd image (default: '${IMAGE_ETCD}')"
+  echo "  --image-kube-apiserver string              kube-apiserver image (default: '${IMAGE_KUBE_APISERVER}')"
+  echo "  --image-kube-controller-manager string     kube-controller-manager image (default: '${IMAGE_KUBE_CONTROLLER_MANAGER}')"
+  echo "  --image-kube-scheduler string              kube-scheduler image (default: '${IMAGE_KUBE_SCHEDULER}')"
+  echo "  --image-fake-kubelet string                fake-kubelet image (default: '${IMAGE_FAKE_KUBELET}')"
 }
 
 function main() {
@@ -506,7 +604,6 @@ function main() {
     return 1
   fi
 
-  local replicas="5"
   local port="8080"
   local name="default"
   local args=()
@@ -514,14 +611,23 @@ function main() {
   while [[ $# -gt 0 ]]; do
     key="$1"
     case ${key} in
-    -r | -r=* | --replicas | --replicas=*)
-      [[ "${key#*=}" != "$key" ]] && replicas="${key#*=}" || { replicas="$2" && shift; }
-      ;;
     -p | -p=* | --port | --port=*)
       [[ "${key#*=}" != "$key" ]] && port="${key#*=}" || { port="$2" && shift; }
       ;;
     -n | -n=* | --name | --name=*)
       [[ "${key#*=}" != "$key" ]] && name="${key#*=}" || { name="$2" && shift; }
+      ;;
+    -r | -r=* | --replicas | --replicas=* | --generate-replicas | --generate-replicas=*)
+      [[ "${key#*=}" != "$key" ]] && GENERATE_REPLICAS="${key#*=}" || { GENERATE_REPLICAS="$2" && shift; }
+      ;;
+    --mock | --mock=*)
+      [[ "${key#*=}" != "$key" ]] && MOCK_FILENAME="${key#*=}" || { MOCK_FILENAME="$2" && shift; }
+      ;;
+    --generate-node-name | --generate-node-name=*)
+      [[ "${key#*=}" != "$key" ]] && GENERATE_NODE_NAME="${key#*=}" || { GENERATE_NODE_NAME="$2" && shift; }
+      ;;
+    --node-name | --node-name=*)
+      [[ "${key#*=}" != "$key" ]] && NODE_NAME="${key#*=}" || { NODE_NAME="$2" && shift; }
       ;;
     --runtime | --runtime=*)
       [[ "${key#*=}" != "$key" ]] && RUNTIME="${key#*=}" || { RUNTIME="$2" && shift; }
@@ -578,7 +684,7 @@ function main() {
 
   case "${command}" in
   "create")
-    create_cluster "${name}" "${port}" "${replicas}"
+    create_cluster "${name}" "${port}"
     ;;
   "delete")
     delete_cluster "${name}"
