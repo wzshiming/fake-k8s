@@ -121,11 +121,10 @@ EOF
 function build_compose() {
   local name="${1}"
   local port="${2}"
-  local works="${3}"
-  local kubeconfig_path="${4}"
-  local admin_crt_path="${5}"
-  local admin_key_path="${6}"
-  local ca_crt_path="${7}"
+  local kubeconfig_path="${3}"
+  local admin_crt_path="${4}"
+  local admin_key_path="${5}"
+  local ca_crt_path="${6}"
 
   cat <<EOF
 version: "3.1"
@@ -133,7 +132,7 @@ services:
   etcd:
     container_name: "${name}-etcd"
     image: ${IMAGE_ETCD}
-    restart: always
+    restart: unless-stopped
     command:
       - etcd
       - --data-dir
@@ -154,7 +153,7 @@ services:
   kube_apiserver:
     container_name: "${name}-kube-apiserver"
     image: ${IMAGE_KUBE_APISERVER}
-    restart: always
+    restart: unless-stopped
     links:
       - etcd
     ports:
@@ -219,12 +218,11 @@ EOF
 EOF
   fi
 
-  if [[ "${works}" == "true" ]]; then
-    cat <<EOF
+  cat <<EOF
   kube_controller:
     container_name: "${name}-kube-controller"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
-    restart: always
+    restart: unless-stopped
     command:
       - kube-controller-manager
       - --kubeconfig
@@ -234,14 +232,11 @@ EOF
     configs:
       - source: kubeconfig
         target: /root/.kube/config
-EOF
-  fi
 
-  cat <<EOF
   kube_scheduler:
     container_name: "${name}-kube-scheduler"
     image: ${IMAGE_KUBE_SCHEDULER}
-    restart: always
+    restart: unless-stopped
     command:
       - kube-scheduler
       - --kubeconfig
@@ -255,7 +250,7 @@ EOF
   fake_kubelet:
     container_name: "${name}-fake-kubelet"
     image: ${IMAGE_FAKE_KUBELET}
-    restart: always
+    restart: unless-stopped
     command:
       - --kubeconfig
       - /root/.kube/config
@@ -430,52 +425,75 @@ function get_resource_kind() {
   fi
 }
 
-function mock_cluster() {
-  local recover="${1}"
-  local kubeconfig="${2}"
-  local resource
+function mock_resource() {
+  local kubeconfig="${1}"
+  local resource="${2}"
+  local other_resource="${3}"
+  local apply_resource
+  local new_resource
+  local resource_old_uid
+  local resource_uid
+  local resource_version
+  local resource_kind
   local resource_name
   local resource_namespace
-  local resource_uid
-  local resource_kind
-  local resource_version
-  local new_resource
-  local new_resource_uid
+  local item
+  if [[ "${resource}" == "" ]]; then
+    return
+  fi
+  echo "${resource}" | jq -r '"Imported \(.kind) \(.metadata.name)"'
 
-  while true; do
-    resource="$(cat "${recover}" | jq '.[0]')"
-    resource_name="$(echo "${resource}" | jq -r '.metadata.name // ""')"
-    if [[ "${resource_name}" = "" ]]; then
-      break
-    fi
-    resource_namespace="$(echo "${resource}" | jq -r '.metadata.namespace // ""')"
-    resource_uid="$(echo "${resource}" | jq -r '.metadata.uid // ""')"
-    resource_kind="$(echo "${resource}" | jq -r '.kind // ""')"
-    resource_version="$(echo "${resource}" | jq -r '.apiVersion // ""')"
-    resource_kind=$(get_resource_kind "${resource_version}" "${resource_kind}")
+  if [[ "${other_resource}" == "" ]]; then
+    return
+  fi
 
-    cat "${recover}" | jq '.[1:]' >"${recover}.tmp"
-    mv "${recover}.tmp" "${recover}"
+  for resource_uid in $(echo "${resource}" | jq '.metadata.uid'); do
+    item="$(echo "${resource}" | jq "select( .metadata.uid == ${resource_uid} )")"
+    resource_version="$(echo "${item}" | jq '.apiVersion')"
+    resource_kind="$(echo "${item}" | jq '.kind')"
+    resource_name="$(echo "${item}" | jq '.metadata.name')"
+    resource_namespace="$(echo "${item}" | jq '.metadata.namespace')"
 
-    if [[ "${resource_kind}" == "Namespace" ]]; then
-      case "${resource_name}" in
-      kube-public | kube-node-lease | kube-system | default)
-        continue
-        ;;
-      *)
-        :
-        ;;
-      esac
+    if [[ "${resource_namespace}" == "null" ]]; then
+      apply_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == ${resource_version} and .metadata.ownerReferences[0].kind == ${resource_kind} and .metadata.ownerReferences[0].name == ${resource_name} )")"
+    else
+      apply_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == ${resource_version} and .metadata.ownerReferences[0].kind == ${resource_kind} and .metadata.ownerReferences[0].name == ${resource_name} and .metadata.namespace == ${resource_namespace} )")"
     fi
 
-    echo "${resource}" | kubectl --kubeconfig="${kubeconfig}" apply --force -f -
-    if grep "\"${resource_uid}\"" "${recover}" >/dev/null; then
-      new_resource=$(kubectl --kubeconfig="${kubeconfig}" get "${resource_kind}" -n "${resource_namespace}" "${resource_name}" -o json)
-      new_resource_uid="$(echo "${new_resource}" | jq -r '.metadata.uid // ""')"
-      cat "${recover}" | sed "s|\"${resource_uid}\"|\"${new_resource_uid}\"|g" >"${recover}.tmp"
-      mv "${recover}.tmp" "${recover}"
+    if [[ "${apply_resource}" == "" ]]; then
+      continue
     fi
+
+    resource_old_uid="$(echo "${apply_resource}" | jq '.metadata.ownerReferences[0].uid' | head -n 1)"
+    new_resource="$(echo "${apply_resource//${resource_old_uid}/${resource_uid}}" | kubectl --kubeconfig="${kubeconfig}" apply --force -o json -f -)"
+    if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
+      new_resource="$(echo "${new_resource}" | jq '.items | .[]')"
+    fi
+    if [[ "${new_resource}" == "" ]]; then
+      continue
+    fi
+
+    other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != ${resource_version} or .metadata.ownerReferences[0].kind != ${resource_kind} or .metadata.ownerReferences[0].name != ${resource_name} or .metadata.namespace != ${resource_namespace} )")"
+
+    mock_resource "${kubeconfig}" "${new_resource}" "${other_resource}"
   done
+}
+
+function mock_cluster() {
+  local kubeconfig="${1}"
+  local resources="${2}"
+  local new_resource
+  local other_resource
+  local apply_resource
+
+  resources="$(echo "${resources}" | jq '.[] | select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
+  apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
+  new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --force -o json -f -)"
+  if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
+    new_resource="$(echo "${new_resource}" | jq '.items | .[]')"
+  fi
+  other_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences != null )')"
+  mock_resource "${kubeconfig}" "${new_resource}" "${other_resource}"
 }
 
 function create_cluster() {
@@ -504,28 +522,13 @@ function create_cluster() {
     build_kubeconfig "http://127.0.0.1:${port}" >"${tmpdir}/kubeconfig.yaml"
   fi
 
-  echo "Output kubeconfig.yaml to ${tmpdir}/kubeconfig.yaml"
-
-  if [[ "${MOCK_CONTENT}" != "" ]]; then
-    if is_tls "${kube_version}"; then
-      build_compose "${full_name}" "${port}" "false" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
-    else
-      build_compose "${full_name}" "${port}" "false" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
-    fi
-    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d --remove-orphans
-
-    echo "${MOCK_CONTENT}" >"${tmpdir}/origin-recover.json"
-    cp "${tmpdir}/origin-recover.json" "${tmpdir}/recover.json"
-    mock_cluster "${tmpdir}/recover.json" "${tmpdir}/kubeconfig.yaml"
-  fi
-
   if is_tls "${kube_version}"; then
-    build_compose "${full_name}" "${port}" "true" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
+    build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
   else
-    build_compose "${full_name}" "${port}" "true" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
+    build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
   fi
 
-  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d --no-recreate
+  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
   if command_exist kubectl; then
     if is_tls "${kube_version}"; then
@@ -541,6 +544,14 @@ function create_cluster() {
     done
     kubectl --context="${full_name}" get node
   fi
+
+  if [[ "${MOCK_CONTENT}" != "" ]]; then
+    echo "Importing mock data"
+    "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
+    mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK_CONTENT}"
+    "${RUNTIME}" start "${full_name}-kube-controller" >/dev/null 2>&1
+  fi
+
   echo "Created cluster ${full_name}."
 }
 
