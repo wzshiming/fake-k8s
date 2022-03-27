@@ -5,6 +5,21 @@ function command_exist() {
   type "${command}" >/dev/null 2>&1
 }
 
+function is_true() {
+  local bool="${1}"
+  case "${bool}" in
+  T* | t* | Y* | y* | 1 | on)
+    return 0
+    ;;
+  F* | f* | N* | n* | 0 | off)
+    return 1
+    ;;
+  *)
+    return 2
+    ;;
+  esac
+}
+
 declare -A etcd_versions=(
   ["8"]="3.0.17"
   ["9"]="3.1.12"
@@ -70,6 +85,12 @@ function init_global_flags() {
   FAKE_VERSION="${FAKE_VERSION:-v0.3.4}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
+
+  if [[ "$(get_release_version "${KUBE_VERSION}")" -ge "20" ]]; then
+    SECURE_PORT="${SECURE_PORT:-true}"
+  else
+    SECURE_PORT="${SECURE_PORT:-false}"
+  fi
 
   KUBE_IMAGE_PREFIX="${KUBE_IMAGE_PREFIX:-k8s.gcr.io}"
   FAKE_IMAGE_PREFIX="${FAKE_IMAGE_PREFIX:-ghcr.io/wzshiming/fake-kubelet}"
@@ -400,11 +421,6 @@ function unset_default_kubeconfig() {
   kubectl config delete-user "${name}"
 }
 
-function is_tls() {
-  local kube_version="${1}"
-  [[ "${kube_version}" -ge "20" ]]
-}
-
 function detection_runtime() {
   if command_exist docker; then
     echo docker
@@ -500,45 +516,46 @@ function create_cluster() {
   local name="${1}"
   local port="${2}"
   local full_name="fake-k8s-${name}"
-  local pkidir="${TMPDIR}/pki/${name}"
   local tmpdir="${TMPDIR}/clusters/${name}"
-  local kube_version
+  local pkidir="${tmpdir}/pki"
+  local scheme="http"
+  local incluster_port="8080"
+  local admin_crt=""
+  local admin_key=""
+  local ca_crt=""
 
-  kube_version="$(get_release_version "${KUBE_VERSION}")"
   mkdir -p "${tmpdir}"
 
-  if is_tls "${kube_version}"; then
+  if is_true "${SECURE_PORT}"; then
+    # generate pki
     mkdir -p "${pkidir}"
     gen_cert "${full_name}" "${pkidir}"
-
-    build_kubeconfig "https://${full_name}-kube-apiserver:6443" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig"
-  else
-    build_kubeconfig "http://${full_name}-kube-apiserver:8080" >"${tmpdir}/kubeconfig"
+    admin_crt="${pkidir}/admin.crt"
+    admin_key="${pkidir}/admin.key"
+    ca_crt="${pkidir}/ca.crt"
+    scheme="https"
+    incluster_port="6443"
   fi
 
-  if is_tls "${kube_version}"; then
-    build_kubeconfig "https://127.0.0.1:${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/kubeconfig.yaml"
-  else
-    build_kubeconfig "http://127.0.0.1:${port}" >"${tmpdir}/kubeconfig.yaml"
-  fi
+  # Create in-cluster kubeconfig
+  build_kubeconfig "${scheme}://${full_name}-kube-apiserver:${incluster_port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/kubeconfig"
 
-  if is_tls "${kube_version}"; then
-    build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt" >"${tmpdir}/docker-compose.yaml"
-  else
-    build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" >"${tmpdir}/docker-compose.yaml"
-  fi
+  # Create local kubeconfig
+  build_kubeconfig "${scheme}://127.0.0.1:${port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/kubeconfig.yaml"
 
+  # Create cluster compose
+  build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
+
+  # Start cluster with compose
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
 
   if command_exist kubectl; then
-    if is_tls "${kube_version}"; then
-      set_default_kubeconfig "${full_name}" "${port}" "${pkidir}/admin.crt" "${pkidir}/admin.key" "${pkidir}/ca.crt"
-    else
-      set_default_kubeconfig "${full_name}" "${port}"
-    fi
+    # Set up default kubeconfig
+    set_default_kubeconfig "${full_name}" "${port}" "${admin_crt}" "${admin_key}" "${ca_crt}"
 
+    # Wait for apiserver to be ready
     echo "kubectl --context=${full_name} get node"
-    for i in $(seq 1 10); do
+    for _ in $(seq 1 10); do
       kubectl --context="${full_name}" get node >/dev/null 2>&1 && break
       sleep 1
     done
@@ -546,6 +563,7 @@ function create_cluster() {
   fi
 
   if [[ "${MOCK_CONTENT}" != "" ]]; then
+    # Stop kube-controller-manager and import mock data
     echo "Importing mock data"
     "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
     mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK_CONTENT}"
@@ -610,6 +628,7 @@ function usage() {
   echo "  --generate-node-name string                generate node name (default: '${GENERATE_NODE_NAME}')"
   echo "  --node-name strings                        extra node name (default: '${NODE_NAME}')"
   echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
+  echo "  --secure-port boolean                      use secure port (default: '${SECURE_PORT}')"
   echo "  --fake-version string                      version of the fake image (default: '${FAKE_VERSION}')"
   echo "  --kube-version string                      version of the kubernetes image (default: '${KUBE_VERSION}')"
   echo "  --etcd-version string                      version of the etcd image (default: '${ETCD_VERSION}')"
@@ -628,7 +647,9 @@ function main() {
     return 1
   fi
 
+  # TODO: Use any available port instead of 8080
   local port="8080"
+
   local name="default"
   local args=()
 
@@ -655,6 +676,9 @@ function main() {
       ;;
     --runtime | --runtime=*)
       [[ "${key#*=}" != "$key" ]] && RUNTIME="${key#*=}" || { RUNTIME="$2" && shift; }
+      ;;
+    --secure-port | --secure-port=*)
+      [[ "${key#*=}" != "$key" ]] && SECURE_PORT="${key#*=}" || { SECURE_PORT="$2" && shift; }
       ;;
     --fake-version | --fake-version=*)
       [[ "${key#*=}" != "$key" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="$2" && shift; }
