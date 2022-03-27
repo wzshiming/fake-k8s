@@ -20,6 +20,22 @@ function is_true() {
   esac
 }
 
+# get unused local port
+function unusad_port() {
+  local low_bound=45536
+  local range=20000
+  local candidate
+  for _ in $(seq 1 1000); do
+    candidate="$((low_bound + (RANDOM % range)))"
+    if ! (echo "" >/dev/tcp/127.0.0.1/${candidate}) >/dev/null 2>&1; then
+      echo ${candidate}
+      return 0
+    fi
+  done
+  # fallback to low_bound port if no unusad port is available
+  echo "${low_bound}"
+}
+
 declare -A etcd_versions=(
   ["8"]="3.0.17"
   ["9"]="3.1.12"
@@ -515,6 +531,9 @@ function mock_cluster() {
 function create_cluster() {
   local name="${1}"
   local port="${2}"
+  if [[ "${port}" == "random" || "${port}" == "" ]]; then
+    port="$(unusad_port)"
+  fi
   local full_name="fake-k8s-${name}"
   local tmpdir="${TMPDIR}/clusters/${name}"
   local pkidir="${tmpdir}/pki"
@@ -622,7 +641,7 @@ function usage() {
   echo "Flags:"
   echo "  -h, --help                                 show this help"
   echo "  -n, --name string                          cluster name (default: 'default')"
-  echo "  -p, --port uint16                          port of the apiserver of the cluster (default: '8080')"
+  echo "  -p, --port uint16|random                   port of the apiserver of the cluster (default: 'random')"
   echo "  -r, --replicas, --generate-replicas uint32 number of replicas of the node (default: '${GENERATE_REPLICAS}')"
   echo "  --mock string                              mock specifies the cluster from file (default: '${MOCK_FILENAME}')"
   echo "  --generate-node-name string                generate node name (default: '${GENERATE_NODE_NAME}')"
@@ -647,8 +666,7 @@ function main() {
     return 1
   fi
 
-  # TODO: Use any available port instead of 8080
-  local port="8080"
+  local port=""
 
   local name="default"
   local args=()
