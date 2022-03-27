@@ -28,7 +28,7 @@ function init_global_flags() {
     GENERATE_REPLICAS="${GENERATE_REPLICAS:-5}"
   fi
 
-  FAKE_VERSION="${FAKE_VERSION:-v0.3.4}"
+  FAKE_VERSION="${FAKE_VERSION:-v0.3.5}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
 
@@ -593,6 +593,10 @@ function create_cluster() {
 
   # Start cluster with compose
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+  if [[ "${?}" != 0 ]]; then
+    echo "Failed create cluster"
+    return 1
+  fi
 
   if command_exist kubectl; then
     # Set up default kubeconfig
