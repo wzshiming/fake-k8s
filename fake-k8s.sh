@@ -593,6 +593,10 @@ function create_cluster() {
 
   # Start cluster with compose
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+  if [[ "${?}" != 0 ]]; then
+    echo "Failed create cluster"
+    return 1
+  fi
 
   if command_exist kubectl; then
     # Set up default kubeconfig
