@@ -1,10 +1,97 @@
 #!/usr/bin/env bash
 
+# initialize the global variables
+function init_global_flags() {
+  PROJECT_NAME="fake-k8s"
+  TMPDIR="${TMPDIR:-/tmp}/${PROJECT_NAME}"
+  TMPDIR="${TMPDIR//\/\//\/}"
+
+  RUNTIME="${RUNTIME:-$(detection_runtime)}"
+
+  # take content from the file or stdin
+  MOCK_FILENAME="${MOCK_FILENAME:-}"
+  if [[ "${MOCK_FILENAME}" != "" ]]; then
+    if [[ "${MOCK_FILENAME}" == "-" ]]; then
+      MOCK_CONTENT="$(cat)"
+    else
+      MOCK_CONTENT="$(cat "${MOCK_FILENAME}")"
+    fi
+    if [[ "$(echo "${MOCK_CONTENT}" | jq -r '.kind')" == "List" ]]; then
+      MOCK_CONTENT="$(echo "${MOCK_CONTENT}" | jq '.items | .[]')"
+    fi
+    NODE_NAME="${NODE_NAME:-$(echo "${MOCK_CONTENT}" | jq -r 'select( .kind == "Node" ) | .metadata.name' | tr '\n' ',' | sed 's/,$//')}"
+    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-}"
+    GENERATE_REPLICAS="${GENERATE_REPLICAS:-0}"
+  else
+    NODE_NAME="${NODE_NAME:-}"
+    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
+    GENERATE_REPLICAS="${GENERATE_REPLICAS:-5}"
+  fi
+
+  FAKE_VERSION="${FAKE_VERSION:-v0.3.4}"
+  KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
+  ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
+
+  # kubernetes v1.20 secure port must be enabled
+  if [[ "$(get_release_version "${KUBE_VERSION}")" -ge "20" ]]; then
+    SECURE_PORT="${SECURE_PORT:-true}"
+  else
+    SECURE_PORT="${SECURE_PORT:-false}"
+  fi
+
+  KUBE_IMAGE_PREFIX="${KUBE_IMAGE_PREFIX:-k8s.gcr.io}"
+  FAKE_IMAGE_PREFIX="${FAKE_IMAGE_PREFIX:-ghcr.io/wzshiming/fake-kubelet}"
+  IMAGE_ETCD="${IMAGE_ETCD:-${KUBE_IMAGE_PREFIX}/etcd:${ETCD_VERSION}}"
+  IMAGE_KUBE_APISERVER="${IMAGE_KUBE_APISERVER:-${KUBE_IMAGE_PREFIX}/kube-apiserver:${KUBE_VERSION}}"
+  IMAGE_KUBE_CONTROLLER_MANAGER="${IMAGE_KUBE_CONTROLLER_MANAGER:-${KUBE_IMAGE_PREFIX}/kube-controller-manager:${KUBE_VERSION}}"
+  IMAGE_KUBE_SCHEDULER="${IMAGE_KUBE_SCHEDULER:-${KUBE_IMAGE_PREFIX}/kube-scheduler:${KUBE_VERSION}}"
+  IMAGE_FAKE_KUBELET="${IMAGE_FAKE_KUBELET:-${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}}"
+}
+
+# Etcd version of each kubernetes version
+declare -A etcd_versions=(
+  ["8"]="3.0.17"
+  ["9"]="3.1.12"
+  ["10"]="3.1.12"
+  ["11"]="3.2.18"
+  ["12"]="3.2.24"
+  ["13"]="3.2.24"
+  ["14"]="3.3.10"
+  ["15"]="3.3.10"
+  ["16"]="3.3.17-0"
+  ["17"]="3.4.3-0"
+  ["18"]="3.4.3-0"
+  ["19"]="3.4.13-0"
+  ["20"]="3.4.13-0"
+  ["21"]="3.4.13-0"
+  ["22"]="3.5.1-0"
+  ["23"]="3.5.1-0"
+  ["24"]="3.5.1-0"
+)
+
+# get the etcd version of kubernetes version
+function get_etcd_version() {
+  local kube_version="${1}"
+  local release_version
+  local etcd_version
+  release_version="$(get_release_version "${kube_version}")"
+  if [[ "${release_version}" -gt "24" ]]; then
+    etcd_version="3.5.1-0"
+  elif [[ "${release_version}" -lt "8" ]]; then
+    etcd_version="3.0.17"
+  else
+    etcd_version="${etcd_versions[${release_version}]}"
+  fi
+  echo "${etcd_version}"
+}
+
+# check command exists
 function command_exist() {
   local command="${1}"
   type "${command}" >/dev/null 2>&1
 }
 
+# check the string is true
 function is_true() {
   local bool="${1}"
   case "${bool}" in
@@ -27,6 +114,7 @@ function unusad_port() {
   local candidate
   for _ in $(seq 1 1000); do
     candidate="$((low_bound + (RANDOM % range)))"
+    # just works on bash
     if ! (echo "" >/dev/tcp/127.0.0.1/${candidate}) >/dev/null 2>&1; then
       echo ${candidate}
       return 0
@@ -36,26 +124,7 @@ function unusad_port() {
   echo "${low_bound}"
 }
 
-declare -A etcd_versions=(
-  ["8"]="3.0.17"
-  ["9"]="3.1.12"
-  ["10"]="3.1.12"
-  ["11"]="3.2.18"
-  ["12"]="3.2.24"
-  ["13"]="3.2.24"
-  ["14"]="3.3.10"
-  ["15"]="3.3.10"
-  ["16"]="3.3.17-0"
-  ["17"]="3.4.3-0"
-  ["18"]="3.4.3-0"
-  ["19"]="3.4.13-0"
-  ["20"]="3.4.13-0"
-  ["21"]="3.4.13-0"
-  ["22"]="3.5.1-0"
-  ["23"]="3.5.1-0"
-  ["24"]="3.5.1-0"
-)
-
+# get the minor of version
 function get_release_version() {
   local version="${1}"
   local release_version
@@ -64,59 +133,7 @@ function get_release_version() {
   echo "${release_version}"
 }
 
-function get_etcd_version() {
-  local kube_version="${1}"
-  local release_version
-  local etcd_version
-  release_version="$(get_release_version "${kube_version}")"
-  if [[ "${release_version}" -gt "24" ]]; then
-    etcd_version="3.5.1-0"
-  elif [[ "${release_version}" -lt "8" ]]; then
-    etcd_version="3.0.17"
-  else
-    etcd_version="${etcd_versions[${release_version}]}"
-  fi
-  echo "${etcd_version}"
-}
-
-function init_global_flags() {
-  RUNTIME="${RUNTIME:-$(detection_runtime)}"
-
-  MOCK_FILENAME="${MOCK_FILENAME:-}"
-  if [[ "${MOCK_FILENAME}" != "" ]]; then
-    if [[ "${MOCK_FILENAME}" == "-" ]]; then
-      MOCK_CONTENT="$(jq '.items')"
-    else
-      MOCK_CONTENT="$(cat "${MOCK_FILENAME}" | jq '.items')"
-    fi
-    NODE_NAME="${NODE_NAME:-$(echo "${MOCK_CONTENT}" | jq -r '.[] | select( .kind == "Node" ) | .metadata.name' | tr '\n' ',' | sed 's/,$//')}"
-    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-}"
-    GENERATE_REPLICAS="${GENERATE_REPLICAS:-0}"
-  else
-    NODE_NAME="${NODE_NAME:-}"
-    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
-    GENERATE_REPLICAS="${GENERATE_REPLICAS:-5}"
-  fi
-
-  FAKE_VERSION="${FAKE_VERSION:-v0.3.4}"
-  KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
-  ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
-
-  if [[ "$(get_release_version "${KUBE_VERSION}")" -ge "20" ]]; then
-    SECURE_PORT="${SECURE_PORT:-true}"
-  else
-    SECURE_PORT="${SECURE_PORT:-false}"
-  fi
-
-  KUBE_IMAGE_PREFIX="${KUBE_IMAGE_PREFIX:-k8s.gcr.io}"
-  FAKE_IMAGE_PREFIX="${FAKE_IMAGE_PREFIX:-ghcr.io/wzshiming/fake-kubelet}"
-  IMAGE_ETCD="${IMAGE_ETCD:-${KUBE_IMAGE_PREFIX}/etcd:${ETCD_VERSION}}"
-  IMAGE_KUBE_APISERVER="${IMAGE_KUBE_APISERVER:-${KUBE_IMAGE_PREFIX}/kube-apiserver:${KUBE_VERSION}}"
-  IMAGE_KUBE_CONTROLLER_MANAGER="${IMAGE_KUBE_CONTROLLER_MANAGER:-${KUBE_IMAGE_PREFIX}/kube-controller-manager:${KUBE_VERSION}}"
-  IMAGE_KUBE_SCHEDULER="${IMAGE_KUBE_SCHEDULER:-${KUBE_IMAGE_PREFIX}/kube-scheduler:${KUBE_VERSION}}"
-  IMAGE_FAKE_KUBELET="${IMAGE_FAKE_KUBELET:-${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}}"
-}
-
+# build the kubeconfig file with the given context
 function build_kubeconfig() {
   local address="${1}"
   local admin_crt_path="${2}"
@@ -126,9 +143,9 @@ function build_kubeconfig() {
 apiVersion: v1
 kind: Config
 preferences: {}
-current-context: fake-k8s
+current-context: ${PROJECT_NAME}
 clusters:
-  - name: fake-k8s
+  - name: ${PROJECT_NAME}
     cluster:
       server: ${address}
 EOF
@@ -139,15 +156,15 @@ EOF
   fi
   cat <<EOF
 contexts:
-  - name: fake-k8s
+  - name: ${PROJECT_NAME}
     context:
-      cluster: fake-k8s
+      cluster: ${PROJECT_NAME}
 EOF
   if [[ "${admin_key_path}" != "" ]]; then
     cat <<EOF
-      user: fake-k8s
+      user: ${PROJECT_NAME}
 users:
-  - name: fake-k8s
+  - name: ${PROJECT_NAME}
     user:
       client-certificate-data: $(cat ${admin_crt_path} | base64 | tr -d '\n')
       client-key-data: $(cat ${admin_key_path} | base64 | tr -d '\n')
@@ -155,6 +172,7 @@ EOF
   fi
 }
 
+# build the docker-compose file with the given context
 function build_compose() {
   local name="${1}"
   local port="${2}"
@@ -367,11 +385,26 @@ networks:
 EOF
 }
 
+# Generate the certificates for the kube-apiserver.
 function gen_cert() {
   local name="${1}"
   local dir="${2}"
-  if [[ ! -f "${dir}/openssl.cnf" ]]; then
-    cat <<EOF >"${dir}/openssl.cnf"
+
+  # Generate the ca private key and certificate.
+  if [[ ! -f "${dir}/ca.key" ]]; then
+    openssl genrsa -out "${dir}/ca.key" 2048
+  fi
+  if [[ ! -f "${dir}/ca.crt" ]]; then
+    openssl req -x509 -new -nodes -key "${dir}/ca.key" -subj "/CN=fake-ca" -out "${dir}/ca.crt" -days 36500
+  fi
+
+  # Generate the admin private key and certificate signing request and sign it with the ca.
+  if [[ ! -f "${dir}/admin.key" ]]; then
+    openssl genrsa -out "${dir}/admin.key" 2048
+  fi
+  if [[ ! -f "${dir}/admin.crt" ]]; then
+    if [[ ! -f "${dir}/openssl.cnf" ]]; then
+      cat <<EOF >"${dir}/openssl.cnf"
 [req]
 req_extensions = v3_req
 distinguished_name = req_distinguished_name
@@ -388,21 +421,7 @@ DNS.4 = kubernetes.default.svc.cluster.local
 DNS.5 = ${name}-kube-apiserver
 IP.1 = 127.0.0.1
 EOF
-  fi
-
-  if [[ ! -f "${dir}/ca.key" ]]; then
-    openssl genrsa -out "${dir}/ca.key" 2048
-  fi
-
-  if [[ ! -f "${dir}/ca.crt" ]]; then
-    openssl req -x509 -new -nodes -key "${dir}/ca.key" -subj "/CN=fake-ca" -out "${dir}/ca.crt" -days 36500
-  fi
-
-  if [[ ! -f "${dir}/admin.key" ]]; then
-    openssl genrsa -out "${dir}/admin.key" 2048
-  fi
-
-  if [[ ! -f "${dir}/admin.crt" ]]; then
+    fi
     if [[ ! -f "${dir}/admin.csr" ]]; then
       openssl req -new -key "${dir}/admin.key" -subj "/CN=fake-admin" -out "${dir}/admin.csr" -config "${dir}/openssl.cnf"
     fi
@@ -410,6 +429,7 @@ EOF
   fi
 }
 
+# set the context in default kubeconfig
 function set_default_kubeconfig() {
   local name="${1}"
   local port="${2}"
@@ -420,16 +440,17 @@ function set_default_kubeconfig() {
   if [[ "${admin_key_path}" != "" ]]; then
     kubectl config set "clusters.${name}.server" "https://127.0.0.1:${port}"
     kubectl config set "clusters.${name}.certificate-authority-data" "$(cat "${ca_crt_path}" | base64 | tr -d '\n')"
-    kubectl config set "contexts.${name}.cluster" "${name}"
-    kubectl config set "contexts.${name}.user" "${name}"
     kubectl config set "users.${name}.client-certificate-data" "$(cat "${admin_crt_path}" | base64 | tr -d '\n')"
     kubectl config set "users.${name}.client-key-data" "$(cat "${admin_key_path}" | base64 | tr -d '\n')"
+    kubectl config set "contexts.${name}.user" "${name}"
+    kubectl config set "contexts.${name}.cluster" "${name}"
   else
     kubectl config set "clusters.${name}.server" "http://127.0.0.1:${port}"
     kubectl config set "contexts.${name}.cluster" "${name}"
   fi
 }
 
+# unset the context in default kubeconfig
 function unset_default_kubeconfig() {
   local name="${1}"
   kubectl config delete-context "${name}"
@@ -437,6 +458,7 @@ function unset_default_kubeconfig() {
   kubectl config delete-user "${name}"
 }
 
+# detect the runtime for the current system
 function detection_runtime() {
   if command_exist docker; then
     echo docker
@@ -447,6 +469,7 @@ function detection_runtime() {
   fi
 }
 
+# get resource kind full name for kubernetes resource
 function get_resource_kind() {
   local api_version="${1}"
   local kind="${2}"
@@ -457,6 +480,7 @@ function get_resource_kind() {
   fi
 }
 
+# import to cluster from given resource and modify the resource uid
 function mock_resource() {
   local kubeconfig="${1}"
   local resource="${2}"
@@ -511,6 +535,7 @@ function mock_resource() {
   done
 }
 
+# import to cluster from given resource
 function mock_cluster() {
   local kubeconfig="${1}"
   local resources="${2}"
@@ -518,7 +543,7 @@ function mock_cluster() {
   local other_resource
   local apply_resource
 
-  resources="$(echo "${resources}" | jq '.[] | select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
+  resources="$(echo "${resources}" | jq 'select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
   apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
   new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --force -o json -f -)"
   if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
@@ -528,13 +553,14 @@ function mock_cluster() {
   mock_resource "${kubeconfig}" "${new_resource}" "${other_resource}"
 }
 
+# create a cluster
 function create_cluster() {
   local name="${1}"
   local port="${2}"
   if [[ "${port}" == "random" || "${port}" == "" ]]; then
     port="$(unusad_port)"
   fi
-  local full_name="fake-k8s-${name}"
+  local full_name="${PROJECT_NAME}-${name}"
   local tmpdir="${TMPDIR}/clusters/${name}"
   local pkidir="${tmpdir}/pki"
   local scheme="http"
@@ -570,7 +596,7 @@ function create_cluster() {
 
   if command_exist kubectl; then
     # Set up default kubeconfig
-    set_default_kubeconfig "${full_name}" "${port}" "${admin_crt}" "${admin_key}" "${ca_crt}"
+    set_default_kubeconfig "${full_name}" "${port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >/dev/null 2>&1
 
     # Wait for apiserver to be ready
     echo "kubectl --context=${full_name} get node"
@@ -592,14 +618,14 @@ function create_cluster() {
   echo "Created cluster ${full_name}."
 }
 
+# delete a cluster
 function delete_cluster() {
   local name="${1}"
-
   local tmpdir="${TMPDIR}/clusters/${name}"
-  local full_name="fake-k8s-${name}"
+  local full_name="${PROJECT_NAME}-${name}"
 
   if command_exist kubectl; then
-    unset_default_kubeconfig "${full_name}"
+    unset_default_kubeconfig "${full_name}" >/dev/null 2>&1
   fi
 
   if [[ -f "${tmpdir}/docker-compose.yaml" ]]; then
@@ -613,12 +639,14 @@ function delete_cluster() {
   echo "Deleted cluster ${full_name}."
 }
 
+# list all clusters
 function list_cluster() {
   for file in "${TMPDIR}"/clusters/*/kubeconfig.yaml; do
     echo "${file}" | grep -o -e "/\([^/]\+\)/kubeconfig\.yaml$" | sed "s|/kubeconfig.yaml$||" | sed "s|^/||"
   done
 }
 
+# list all images used by fake cluster
 function images() {
   echo "${IMAGE_ETCD}"
   echo "${IMAGE_KUBE_APISERVER}"
@@ -627,9 +655,7 @@ function images() {
   echo "${IMAGE_FAKE_KUBELET}"
 }
 
-TMPDIR="${TMPDIR:-/tmp}/fake-k8s"
-TMPDIR="${TMPDIR//\/\//\/}"
-
+# usage info
 function usage() {
   init_global_flags
   echo "Usage $0"
@@ -642,9 +668,9 @@ function usage() {
   echo "  -h, --help                                 show this help"
   echo "  -n, --name string                          cluster name (default: 'default')"
   echo "  -p, --port uint16|random                   port of the apiserver of the cluster (default: 'random')"
-  echo "  -r, --replicas, --generate-replicas uint32 number of replicas of the node (default: '${GENERATE_REPLICAS}')"
+  echo "  -r, --generate-replicas uint32             number of replicas of the generate node (default: '${GENERATE_REPLICAS}')"
+  echo "  --generate-node-name string                generate node name prefix (default: '${GENERATE_NODE_NAME}')"
   echo "  --mock string                              mock specifies the cluster from file (default: '${MOCK_FILENAME}')"
-  echo "  --generate-node-name string                generate node name (default: '${GENERATE_NODE_NAME}')"
   echo "  --node-name strings                        extra node name (default: '${NODE_NAME}')"
   echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
   echo "  --secure-port boolean                      use secure port (default: '${SECURE_PORT}')"
@@ -667,66 +693,65 @@ function main() {
   fi
 
   local port=""
-
   local name="default"
   local args=()
 
-  while [[ $# -gt 0 ]]; do
-    key="$1"
+  while [[ "$#" -gt 0 ]]; do
+    key="${1}"
     case ${key} in
     -p | -p=* | --port | --port=*)
-      [[ "${key#*=}" != "$key" ]] && port="${key#*=}" || { port="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && port="${key#*=}" || { port="${2}" && shift; }
       ;;
     -n | -n=* | --name | --name=*)
-      [[ "${key#*=}" != "$key" ]] && name="${key#*=}" || { name="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && name="${key#*=}" || { name="${2}" && shift; }
       ;;
     -r | -r=* | --replicas | --replicas=* | --generate-replicas | --generate-replicas=*)
-      [[ "${key#*=}" != "$key" ]] && GENERATE_REPLICAS="${key#*=}" || { GENERATE_REPLICAS="$2" && shift; }
-      ;;
-    --mock | --mock=*)
-      [[ "${key#*=}" != "$key" ]] && MOCK_FILENAME="${key#*=}" || { MOCK_FILENAME="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && GENERATE_REPLICAS="${key#*=}" || { GENERATE_REPLICAS="${2}" && shift; }
       ;;
     --generate-node-name | --generate-node-name=*)
-      [[ "${key#*=}" != "$key" ]] && GENERATE_NODE_NAME="${key#*=}" || { GENERATE_NODE_NAME="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && GENERATE_NODE_NAME="${key#*=}" || { GENERATE_NODE_NAME="${2}" && shift; }
+      ;;
+    --mock | --mock=*)
+      [[ "${key#*=}" != "${key}" ]] && MOCK_FILENAME="${key#*=}" || { MOCK_FILENAME="${2}" && shift; }
       ;;
     --node-name | --node-name=*)
-      [[ "${key#*=}" != "$key" ]] && NODE_NAME="${key#*=}" || { NODE_NAME="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && NODE_NAME="${key#*=}" || { NODE_NAME="${2}" && shift; }
       ;;
     --runtime | --runtime=*)
-      [[ "${key#*=}" != "$key" ]] && RUNTIME="${key#*=}" || { RUNTIME="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && RUNTIME="${key#*=}" || { RUNTIME="${2}" && shift; }
       ;;
     --secure-port | --secure-port=*)
-      [[ "${key#*=}" != "$key" ]] && SECURE_PORT="${key#*=}" || { SECURE_PORT="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && SECURE_PORT="${key#*=}" || { SECURE_PORT="${2}" && shift; }
       ;;
     --fake-version | --fake-version=*)
-      [[ "${key#*=}" != "$key" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="${2}" && shift; }
       ;;
     --kube-version | --kube-version=*)
-      [[ "${key#*=}" != "$key" ]] && KUBE_VERSION="${key#*=}" || { KUBE_VERSION="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && KUBE_VERSION="${key#*=}" || { KUBE_VERSION="${2}" && shift; }
       ;;
     --etcd-version | --etcd-version=*)
-      [[ "${key#*=}" != "$key" ]] && ETCD_VERSION="${key#*=}" || { ETCD_VERSION="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && ETCD_VERSION="${key#*=}" || { ETCD_VERSION="${2}" && shift; }
       ;;
     --kube-image-prefix | --kube-image-prefix=*)
-      [[ "${key#*=}" != "$key" ]] && KUBE_IMAGE_PREFIX="${key#*=}" || { KUBE_IMAGE_PREFIX="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && KUBE_IMAGE_PREFIX="${key#*=}" || { KUBE_IMAGE_PREFIX="${2}" && shift; }
       ;;
     --fake-image-prefix | --fake-image-prefix=*)
-      [[ "${key#*=}" != "$key" ]] && FAKE_IMAGE_PREFIX="${key#*=}" || { FAKE_IMAGE_PREFIX="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && FAKE_IMAGE_PREFIX="${key#*=}" || { FAKE_IMAGE_PREFIX="${2}" && shift; }
       ;;
     --image-etcd | --image-etcd=*)
-      [[ "${key#*=}" != "$key" ]] && IMAGE_ETCD="${key#*=}" || { IMAGE_ETCD="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && IMAGE_ETCD="${key#*=}" || { IMAGE_ETCD="${2}" && shift; }
       ;;
     --image-kube-apiserver | --image-kube-apiserver=*)
-      [[ "${key#*=}" != "$key" ]] && IMAGE_KUBE_APISERVER="${key#*=}" || { IMAGE_KUBE_APISERVER="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && IMAGE_KUBE_APISERVER="${key#*=}" || { IMAGE_KUBE_APISERVER="${2}" && shift; }
       ;;
     --image-kube-controller-manager | --image-kube-controller-manager=*)
-      [[ "${key#*=}" != "$key" ]] && IMAGE_KUBE_CONTROLLER_MANAGER="${key#*=}" || { IMAGE_KUBE_CONTROLLER_MANAGER="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && IMAGE_KUBE_CONTROLLER_MANAGER="${key#*=}" || { IMAGE_KUBE_CONTROLLER_MANAGER="${2}" && shift; }
       ;;
     --image-kube-scheduler | --image-kube-scheduler=*)
-      [[ "${key#*=}" != "$key" ]] && IMAGE_KUBE_SCHEDULER="${key#*=}" || { IMAGE_KUBE_SCHEDULER="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && IMAGE_KUBE_SCHEDULER="${key#*=}" || { IMAGE_KUBE_SCHEDULER="${2}" && shift; }
       ;;
     --image-fake-kubelet | --image-fake-kubelet=*)
-      [[ "${key#*=}" != "$key" ]] && IMAGE_FAKE_KUBELET="${key#*=}" || { IMAGE_FAKE_KUBELET="$2" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && IMAGE_FAKE_KUBELET="${key#*=}" || { IMAGE_FAKE_KUBELET="${2}" && shift; }
       ;;
     -h | --help)
       usage
@@ -768,4 +793,6 @@ function main() {
   esac
 }
 
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi
