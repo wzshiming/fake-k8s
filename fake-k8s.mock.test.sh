@@ -16,4 +16,11 @@ kind delete cluster
 
 ./fake-k8s.sh delete
 
+echo "=== kind content ==="
+echo "${kind_content}"
+
+echo "=== fake-k8s content ==="
+echo "${fake_k8s_content}"
+
+echo "=== diff ==="
 diff <(echo "${kind_content}") <(echo "${fake_k8s_content}")
