@@ -19,7 +19,7 @@ function init_global_flags() {
     if [[ "$(echo "${MOCK_CONTENT}" | jq -r '.kind')" == "List" ]]; then
       MOCK_CONTENT="$(echo "${MOCK_CONTENT}" | jq '.items | .[]')"
     fi
-    NODE_NAME="${NODE_NAME:-$(echo "${MOCK_CONTENT}" | jq -r 'select( .kind == "Node" ) | .metadata.name' | tr '\n' ',' | sed 's/,$//')}"
+    NODE_NAME="${NODE_NAME:-}"
     GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-}"
     GENERATE_REPLICAS="${GENERATE_REPLICAS:-0}"
   else
@@ -177,9 +177,10 @@ function build_compose() {
   local name="${1}"
   local port="${2}"
   local kubeconfig_path="${3}"
-  local admin_crt_path="${4}"
-  local admin_key_path="${5}"
-  local ca_crt_path="${6}"
+  local etcd_data="${4}"
+  local admin_crt_path="${5}"
+  local admin_key_path="${6}"
+  local ca_crt_path="${7}"
 
   cat <<EOF
 version: "3.1"
@@ -204,7 +205,8 @@ services:
       - http://0.0.0.0:2379
       - --initial-cluster
       - node0=http://0.0.0.0:2380
-
+    volumes:
+      - ${etcd_data}:/etcd-data:rw
   kube_apiserver:
     container_name: "${name}-kube-apiserver"
     image: ${IMAGE_KUBE_APISERVER}
@@ -337,20 +339,29 @@ EOF
             type: fake-kubelet
           name: {{ .metadata.name }}
       NODE_INITIALIZATION_TEMPLATE: |-
+        {{ if not .status.addresses }}
         addresses:
         - address: {{ NodeIP }}
           type: InternalIP
+        {{ end }}
+        {{ if not .status.allocatable }}
         allocatable:
           cpu: 1k
           memory: 1Ti
           pods: 1M
+        {{ end }}
+        {{ if not .status.capacity }}
         capacity:
           cpu: 1k
           memory: 1Ti
           pods: 1M
+        {{ end }}
+        {{ if not .status.daemonEndpoints }}
         daemonEndpoints:
           kubeletEndpoint:
             Port: 0
+        {{ end }}
+        {{ if not .status.nodeInfo }}
         nodeInfo:
           architecture: amd64
           bootID: ""
@@ -362,6 +373,7 @@ EOF
           operatingSystem: Linux
           osImage: ""
           systemUUID: ""
+        {{ end }}
         phase: Running
 configs:
   kubeconfig:
@@ -544,6 +556,7 @@ function mock_cluster() {
   local apply_resource
 
   resources="$(echo "${resources}" | jq 'select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
+  resources="$(echo "${resources}" | jq 'del(.metadata.uid)')"
   apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
   new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -o json -f -)"
   if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
@@ -563,13 +576,14 @@ function create_cluster() {
   local full_name="${PROJECT_NAME}-${name}"
   local tmpdir="${TMPDIR}/clusters/${name}"
   local pkidir="${tmpdir}/pki"
+  local etcddir="${tmpdir}/etcd"
   local scheme="http"
   local incluster_port="8080"
   local admin_crt=""
   local admin_key=""
   local ca_crt=""
 
-  mkdir -p "${tmpdir}"
+  mkdir -p "${tmpdir}" "${etcddir}"
 
   if is_true "${SECURE_PORT}"; then
     # generate pki
@@ -589,7 +603,7 @@ function create_cluster() {
   build_kubeconfig "${scheme}://127.0.0.1:${port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/kubeconfig.yaml"
 
   # Create cluster compose
-  build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
+  build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
 
   # Start cluster with compose
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
@@ -616,7 +630,19 @@ function create_cluster() {
     echo "Importing mock data"
     "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
     mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK_CONTENT}"
-    "${RUNTIME}" start "${full_name}-kube-controller" >/dev/null 2>&1
+
+    # addition node from mock file
+    NODE_NAME="${NODE_NAME},$(echo "${MOCK_CONTENT}" | jq -r 'select( .kind == "Node" ) | .metadata.name' | tr '\n' ',' | sed 's/,$//')"
+    NODE_NAME="${NODE_NAME//,,/,}"
+
+    # Recreate fake-kubelet
+    build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
+
+    # Start cluster with compose
+    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+
+    echo "kubectl --context=${full_name} get node"
+    kubectl --context="${full_name}" get node
   fi
 
   echo "Created cluster ${full_name}."
