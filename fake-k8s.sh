@@ -521,7 +521,7 @@ function mock_resource() {
     fi
 
     resource_old_uid="$(echo "${apply_resource}" | jq '.metadata.ownerReferences[0].uid' | head -n 1)"
-    new_resource="$(echo "${apply_resource//${resource_old_uid}/${resource_uid}}" | kubectl --kubeconfig="${kubeconfig}" apply --force -o json -f -)"
+    new_resource="$(echo "${apply_resource//${resource_old_uid}/${resource_uid}}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -o json -f -)"
     if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
       new_resource="$(echo "${new_resource}" | jq '.items | .[]')"
     fi
@@ -545,7 +545,7 @@ function mock_cluster() {
 
   resources="$(echo "${resources}" | jq 'select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
   apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
-  new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --force -o json -f -)"
+  new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -o json -f -)"
   if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
     new_resource="$(echo "${new_resource}" | jq '.items | .[]')"
   fi
