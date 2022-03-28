@@ -7,7 +7,7 @@ kind create cluster --wait 10s --image=docker.io/kindest/node:"${kube_version}"
 sleep 30
 
 kubectl --context=kind-kind get "${resource}" -A -o json | ./fake-k8s.sh create --kube-version "${kube_version}" --mock -
-sleep 5
+sleep 30
 
 kind_content="$(kubectl --context=kind-kind get "${resource}" -A -o name)"
 fake_k8s_content="$(kubectl --context=fake-k8s-default get "${resource}" -A -o name)"
