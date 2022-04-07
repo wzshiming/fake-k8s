@@ -151,7 +151,8 @@ clusters:
 EOF
   if [[ "${admin_key_path}" != "" ]]; then
     cat <<EOF
-      certificate-authority-data: $(cat ${ca_crt_path} | base64 | tr -d '\n')
+      insecure-skip-tls-verify: true
+      # certificate-authority-data: $(cat ${ca_crt_path} | base64 | tr -d '\n')
 EOF
   fi
   cat <<EOF
@@ -399,8 +400,7 @@ EOF
 
 # Generate the certificates for the kube-apiserver.
 function gen_cert() {
-  local name="${1}"
-  local dir="${2}"
+  local dir="${1}"
 
   # Generate the ca private key and certificate.
   if [[ ! -f "${dir}/ca.key" ]]; then
@@ -430,7 +430,6 @@ DNS.1 = kubernetes
 DNS.2 = kubernetes.default
 DNS.3 = kubernetes.default.svc
 DNS.4 = kubernetes.default.svc.cluster.local
-DNS.5 = ${name}-kube-apiserver
 IP.1 = 127.0.0.1
 EOF
     fi
@@ -575,7 +574,7 @@ function create_cluster() {
   fi
   local full_name="${PROJECT_NAME}-${name}"
   local tmpdir="${TMPDIR}/clusters/${name}"
-  local pkidir="${tmpdir}/pki"
+  local pkidir="${TMPDIR}/pki"
   local etcddir="${tmpdir}/etcd"
   local scheme="http"
   local incluster_port="8080"
@@ -588,7 +587,7 @@ function create_cluster() {
   if is_true "${SECURE_PORT}"; then
     # generate pki
     mkdir -p "${pkidir}"
-    gen_cert "${full_name}" "${pkidir}"
+    gen_cert "${pkidir}"
     admin_crt="${pkidir}/admin.crt"
     admin_key="${pkidir}/admin.key"
     ca_crt="${pkidir}/ca.crt"
