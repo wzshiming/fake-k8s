@@ -450,7 +450,8 @@ function set_default_kubeconfig() {
 
   if [[ "${admin_key_path}" != "" ]]; then
     kubectl config set "clusters.${name}.server" "https://127.0.0.1:${port}"
-    kubectl config set "clusters.${name}.certificate-authority-data" "$(cat "${ca_crt_path}" | base64 | tr -d '\n')"
+    kubectl config set "clusters.${name}.insecure-skip-tls-verify" "true"
+    # kubectl config set "clusters.${name}.certificate-authority-data" "$(cat "${ca_crt_path}" | base64 | tr -d '\n')"
     kubectl config set "users.${name}.client-certificate-data" "$(cat "${admin_crt_path}" | base64 | tr -d '\n')"
     kubectl config set "users.${name}.client-key-data" "$(cat "${admin_key_path}" | base64 | tr -d '\n')"
     kubectl config set "contexts.${name}.user" "${name}"
