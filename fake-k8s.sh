@@ -28,7 +28,7 @@ function init_global_flags() {
     GENERATE_REPLICAS="${GENERATE_REPLICAS:-5}"
   fi
 
-  FAKE_VERSION="${FAKE_VERSION:-v0.3.5}"
+  FAKE_VERSION="${FAKE_VERSION:-v0.4.0}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
 
@@ -318,6 +318,7 @@ EOF
       - source: kubeconfig
         target: /root/.kube/config
     environment:
+      TAKE_OVER_ALL: "true"
       NODE_NAME: "${NODE_NAME}"
       GENERATE_NODE_NAME: "${GENERATE_NODE_NAME}"
       GENERATE_REPLICAS: "${GENERATE_REPLICAS}"
@@ -340,42 +341,76 @@ EOF
             type: fake-kubelet
           name: {{ .metadata.name }}
       NODE_INITIALIZATION_TEMPLATE: |-
-        {{ if not .status.addresses }}
+        {{ with .status }}
+        {{ with .addresses }}
+        {{ . | YAML }}
+        {{ else }}
         addresses:
         - address: {{ NodeIP }}
           type: InternalIP
         {{ end }}
-        {{ if not .status.allocatable }}
+        {{ with .allocatable }}
+        {{ . | YAML }}
+        {{ else }}
         allocatable:
           cpu: 1k
           memory: 1Ti
           pods: 1M
         {{ end }}
-        {{ if not .status.capacity }}
+        {{ with .capacity }}
+        {{ . | YAML }}
+        {{ else }}
         capacity:
           cpu: 1k
           memory: 1Ti
           pods: 1M
         {{ end }}
-        {{ if not .status.daemonEndpoints }}
+        {{ with .daemonEndpoints }}
+        {{ . | YAML }}
+        {{ else }}
         daemonEndpoints:
           kubeletEndpoint:
             Port: 0
         {{ end }}
-        {{ if not .status.nodeInfo }}
         nodeInfo:
+        {{ with .nodeInfo.architecture }}
+          architecture: {{ . }}
+        {{ else }}
           architecture: amd64
-          bootID: ""
-          containerRuntimeVersion: ""
-          kernelVersion: ""
-          kubeProxyVersion: ""
+        {{ end }}
+        {{ with .nodeInfo.bootID }}
+          bootID: {{ . }}
+        {{ end }}
+        {{ with .nodeInfo.containerRuntimeVersion }}
+          containerRuntimeVersion: {{ . }}
+        {{ end }}
+        {{ with .nodeInfo.kernelVersion }}
+          kernelVersion: {{ . }}
+        {{ end }}
+        {{ with .nodeInfo.kubeProxyVersion }}
+          kubeProxyVersion: {{ . }}
+        {{ end }}
+        {{ with .nodeInfo.kubeletVersion }}
+          kubeletVersion: {{ . }}
+        {{ else }}
           kubeletVersion: fake
-          machineID: ""
+        {{ end }}
+        {{ with .nodeInfo.machineID }}
+          machineID: {{ . }}
+        {{ end }}
+        {{ with .nodeInfo.operatingSystem }}
+          operatingSystem: {{ . }}
+        {{ else }}
           operatingSystem: Linux
-          osImage: ""
-          systemUUID: ""
+        {{ end }}
+        {{ with .nodeInfo.osImage }}
+          osImage: {{ . }}
+        {{ end }}
+        {{ with .nodeInfo.systemUUID }}
+          systemUUID: {{ . }}
         {{ end }}
         phase: Running
+        {{ end }}
 configs:
   kubeconfig:
     file: ${kubeconfig_path}
