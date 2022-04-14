@@ -8,25 +8,14 @@ function init_global_flags() {
 
   RUNTIME="${RUNTIME:-$(detection_runtime)}"
 
-  # take content from the file or stdin
-  MOCK_FILENAME="${MOCK_FILENAME:-}"
-  if [[ "${MOCK_FILENAME}" != "" ]]; then
-    if [[ "${MOCK_FILENAME}" == "-" ]]; then
-      MOCK_CONTENT="$(cat)"
-    else
-      MOCK_CONTENT="$(cat "${MOCK_FILENAME}")"
-    fi
-    if [[ "$(echo "${MOCK_CONTENT}" | jq -r '.kind')" == "List" ]]; then
-      MOCK_CONTENT="$(echo "${MOCK_CONTENT}" | jq '.items | .[]')"
-    fi
-    NODE_NAME="${NODE_NAME:-}"
-    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-}"
+  MOCK="${MOCK:-}"
+  if [[ "${MOCK}" != "" ]]; then
     GENERATE_REPLICAS="${GENERATE_REPLICAS:-0}"
   else
-    NODE_NAME="${NODE_NAME:-}"
-    GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
     GENERATE_REPLICAS="${GENERATE_REPLICAS:-5}"
   fi
+  GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
+  NODE_NAME="${NODE_NAME:-}"
 
   FAKE_VERSION="${FAKE_VERSION:-v0.4.0}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
@@ -152,7 +141,7 @@ EOF
   if [[ "${admin_key_path}" != "" ]]; then
     cat <<EOF
       insecure-skip-tls-verify: true
-      # certificate-authority-data: $(cat ${ca_crt_path} | base64 | tr -d '\n')
+      # certificate-authority-data: $(base64 <"${ca_crt_path}" | tr -d '\n')
 EOF
   fi
   cat <<EOF
@@ -167,8 +156,8 @@ EOF
 users:
   - name: ${PROJECT_NAME}
     user:
-      client-certificate-data: $(cat ${admin_crt_path} | base64 | tr -d '\n')
-      client-key-data: $(cat ${admin_key_path} | base64 | tr -d '\n')
+      client-certificate-data: $(base64 <"${admin_crt_path}" | tr -d '\n')
+      client-key-data: $(base64 <"${admin_key_path}" | tr -d '\n')
 EOF
   fi
 }
@@ -486,9 +475,9 @@ function set_default_kubeconfig() {
   if [[ "${admin_key_path}" != "" ]]; then
     kubectl config set "clusters.${name}.server" "https://127.0.0.1:${port}"
     kubectl config set "clusters.${name}.insecure-skip-tls-verify" "true"
-    # kubectl config set "clusters.${name}.certificate-authority-data" "$(cat "${ca_crt_path}" | base64 | tr -d '\n')"
-    kubectl config set "users.${name}.client-certificate-data" "$(cat "${admin_crt_path}" | base64 | tr -d '\n')"
-    kubectl config set "users.${name}.client-key-data" "$(cat "${admin_key_path}" | base64 | tr -d '\n')"
+    # kubectl config set "clusters.${name}.certificate-authority-data" "$(base64 <"${ca_crt_path}" | tr -d '\n')"
+    kubectl config set "users.${name}.client-certificate-data" "$(base64 <"${admin_crt_path}" | tr -d '\n')"
+    kubectl config set "users.${name}.client-key-data" "$(base64 <"${admin_key_path}" | tr -d '\n')"
     kubectl config set "contexts.${name}.user" "${name}"
     kubectl config set "contexts.${name}.cluster" "${name}"
   else
@@ -513,17 +502,6 @@ function detection_runtime() {
     echo nerdctl
   else
     echo docker
-  fi
-}
-
-# get resource kind full name for kubernetes resource
-function get_resource_kind() {
-  local api_version="${1}"
-  local kind="${2}"
-  if [[ "${api_version}" =~ / ]]; then
-    echo "${kind}.${api_version%%/*}"
-  else
-    echo "${kind}"
   fi
 }
 
@@ -576,7 +554,11 @@ function mock_resource() {
       continue
     fi
 
-    other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != ${resource_version} or .metadata.ownerReferences[0].kind != ${resource_kind} or .metadata.ownerReferences[0].name != ${resource_name} or .metadata.namespace != ${resource_namespace} )")"
+    if [[ "${resource_namespace}" == "null" ]]; then
+      other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != ${resource_version} or .metadata.ownerReferences[0].kind != ${resource_kind} or .metadata.ownerReferences[0].name != ${resource_name} )")"
+    else
+      other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != ${resource_version} or .metadata.ownerReferences[0].kind != ${resource_kind} or .metadata.ownerReferences[0].name != ${resource_name} or .metadata.namespace != ${resource_namespace} )")"
+    fi
 
     mock_resource "${kubeconfig}" "${new_resource}" "${other_resource}"
   done
@@ -591,7 +573,7 @@ function mock_cluster() {
   local apply_resource
 
   resources="$(echo "${resources}" | jq 'select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
-  resources="$(echo "${resources}" | jq 'del(.metadata.uid)')"
+  resources="$(echo "${resources}" | jq 'del( .metadata.uid )')"
   apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
   new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -o json -f -)"
   if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
@@ -617,10 +599,15 @@ function create_cluster() {
   local admin_crt=""
   local admin_key=""
   local ca_crt=""
+  local mock_content=""
 
   mkdir -p "${tmpdir}" "${etcddir}"
 
   if is_true "${SECURE_PORT}"; then
+    if ! command_exist openssl; then
+      echo "OpenSSL needs to be installed"
+      return 1
+    fi
     # generate pki
     mkdir -p "${pkidir}"
     gen_cert "${pkidir}"
@@ -660,15 +647,30 @@ function create_cluster() {
     kubectl --context="${full_name}" get node
   fi
 
-  if [[ "${MOCK_CONTENT}" != "" ]]; then
+  if [[ "${MOCK}" != "" ]]; then
+    if ! command_exist kubectl; then
+      echo "Kubectl needs to be installed"
+      return 1
+    fi
+    if ! command_exist jq; then
+      echo "JQ needs to be installed"
+      return 1
+    fi
+
+    # take content from the file or stdin
+    if [[ "${MOCK}" == "-" ]]; then
+      mock_content="$(cat)"
+    else
+      mock_content="$(cat "${MOCK}")"
+    fi
+    if [[ "$(echo "${mock_content}" | jq -r '.kind')" == "List" ]]; then
+      mock_content="$(echo "${mock_content}" | jq '.items | .[]')"
+    fi
+
     # Stop kube-controller-manager and import mock data
     echo "Importing mock data"
     "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
-    mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK_CONTENT}"
-
-    # addition node from mock file
-    NODE_NAME="${NODE_NAME},$(echo "${MOCK_CONTENT}" | jq -r 'select( .kind == "Node" ) | .metadata.name' | tr '\n' ',' | sed 's/,$//')"
-    NODE_NAME="${NODE_NAME//,,/,}"
+    mock_cluster "${tmpdir}/kubeconfig.yaml" "${mock_content}"
 
     # Recreate fake-kubelet
     build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
@@ -680,6 +682,9 @@ function create_cluster() {
     kubectl --context="${full_name}" get node
   fi
 
+  if ! command_exist kubectl; then
+    echo "kubeconfig is available at ${tmpdir}/kubeconfig.yaml"
+  fi
   echo "Created cluster ${full_name}."
 }
 
@@ -707,7 +712,9 @@ function delete_cluster() {
 # list all clusters
 function list_cluster() {
   for file in "${TMPDIR}"/clusters/*/kubeconfig.yaml; do
-    echo "${file}" | grep -o -e "/\([^/]\+\)/kubeconfig\.yaml$" | sed "s|/kubeconfig.yaml$||" | sed "s|^/||"
+    if [[ -f "${file}" ]]; then
+      echo "${file}" | grep -o -e "/\([^/]\+\)/kubeconfig\.yaml$" | sed "s|/kubeconfig.yaml$||" | sed "s|^/||"
+    fi
   done
 }
 
@@ -735,7 +742,7 @@ function usage() {
   echo "  -p, --port uint16|random                   port of the apiserver of the cluster (default: 'random')"
   echo "  -r, --generate-replicas uint32             number of replicas of the generate node (default: '${GENERATE_REPLICAS}')"
   echo "  --generate-node-name string                generate node name prefix (default: '${GENERATE_NODE_NAME}')"
-  echo "  --mock string                              mock specifies the cluster from file (default: '${MOCK_FILENAME}')"
+  echo "  --mock string                              mock specifies the cluster from file (default: '${MOCK}')"
   echo "  --node-name strings                        extra node name (default: '${NODE_NAME}')"
   echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
   echo "  --secure-port boolean                      use secure port (default: '${SECURE_PORT}')"
@@ -777,7 +784,7 @@ function main() {
       [[ "${key#*=}" != "${key}" ]] && GENERATE_NODE_NAME="${key#*=}" || { GENERATE_NODE_NAME="${2}" && shift; }
       ;;
     --mock | --mock=*)
-      [[ "${key#*=}" != "${key}" ]] && MOCK_FILENAME="${key#*=}" || { MOCK_FILENAME="${2}" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && MOCK="${key#*=}" || { MOCK="${2}" && shift; }
       ;;
     --node-name | --node-name=*)
       [[ "${key#*=}" != "${key}" ]] && NODE_NAME="${key#*=}" || { NODE_NAME="${2}" && shift; }
