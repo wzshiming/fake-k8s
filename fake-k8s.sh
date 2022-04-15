@@ -764,8 +764,8 @@ function usage() {
   echo "  --mock string                              mock specifies the cluster from file (default: '${MOCK}')"
   echo "  --node-name strings                        extra node name (default: '${NODE_NAME}')"
   echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
-  echo "  --secure-port boolean                      use secure port (default: '${SECURE_PORT}')"
-  echo "  --quiet-pull boolean                       Pull without printing progress information (default: '${QUIET_PULL}')"
+  echo "  --secure-port                              use secure port"
+  echo "  --quiet-pull                               pull without printing progress information"
   echo "  --fake-version string                      version of the fake image (default: '${FAKE_VERSION}')"
   echo "  --kube-version string                      version of the kubernetes image (default: '${KUBE_VERSION}')"
   echo "  --etcd-version string                      version of the etcd image (default: '${ETCD_VERSION}')"
@@ -813,10 +813,10 @@ function main() {
       [[ "${key#*=}" != "${key}" ]] && RUNTIME="${key#*=}" || { RUNTIME="${2}" && shift; }
       ;;
     --secure-port | --secure-port=*)
-      [[ "${key#*=}" != "${key}" ]] && SECURE_PORT="${key#*=}" || { SECURE_PORT="${2}" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && SECURE_PORT="${key#*=}" || SECURE_PORT="true"
       ;;
     --quiet-pull | --quiet-pull=*)
-      [[ "${key#*=}" != "${key}" ]] && QUIET_PULL="${key#*=}" || { QUIET_PULL="${2}" && shift; }
+      [[ "${key#*=}" != "${key}" ]] && QUIET_PULL="${key#*=}" || QUIET_PULL="true"
       ;;
     --fake-version | --fake-version=*)
       [[ "${key#*=}" != "${key}" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="${2}" && shift; }
