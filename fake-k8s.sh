@@ -101,7 +101,8 @@ function unusad_port() {
   local low_bound=45536
   local range=20000
   local candidate
-  for _ in $(seq 1 1000); do
+  local i
+  for ((i = 0; i < 10; i++)); do
     candidate="$((low_bound + (RANDOM % range)))"
     # just works on bash
     if ! (echo "" >/dev/tcp/127.0.0.1/${candidate}) >/dev/null 2>&1; then
@@ -109,8 +110,18 @@ function unusad_port() {
       return 0
     fi
   done
-  # fallback to low_bound port if no unusad port is available
-  echo "${low_bound}"
+
+  for ((i = 0; i < "${range}"; i++)); do
+    candidate="$((low_bound + i))"
+    # just works on bash
+    if ! (echo "" >/dev/tcp/127.0.0.1/${candidate}) >/dev/null 2>&1; then
+      echo ${candidate}
+      return 0
+    fi
+  done
+
+  # fallback to low_bound - 1 port if no unusad port is available
+  echo "$((low_bound - 1))"
 }
 
 # get the minor of version
@@ -600,6 +611,7 @@ function create_cluster() {
   local admin_key=""
   local ca_crt=""
   local mock_content=""
+  local i
 
   mkdir -p "${tmpdir}" "${etcddir}"
 
@@ -640,7 +652,7 @@ function create_cluster() {
 
     # Wait for apiserver to be ready
     echo "kubectl --context=${full_name} get node"
-    for _ in $(seq 1 10); do
+    for ((i = 0; i < 10; i++)); do
       kubectl --context="${full_name}" get node >/dev/null 2>&1 && break
       sleep 1
     done
