@@ -20,7 +20,7 @@ releases=(
 function test_release() {
   local release="${1}"
   local name="cluster-${release//./-}"
-  ./fake-k8s.sh create --name "${name}" --kube-version "${release}" --quiet-pull true
+  ./fake-k8s.sh create --name "${name}" --kube-version "${release}" --quiet-pull
 
   for _ in $(seq 1 30); do
     kubectl --context="fake-k8s-${name}" apply -f - <<EOF
