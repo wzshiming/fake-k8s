@@ -28,6 +28,8 @@ function init_global_flags() {
     SECURE_PORT="${SECURE_PORT:-false}"
   fi
 
+  QUIET_PULL="${QUIET_PULL:-false}"
+
   KUBE_IMAGE_PREFIX="${KUBE_IMAGE_PREFIX:-k8s.gcr.io}"
   FAKE_IMAGE_PREFIX="${FAKE_IMAGE_PREFIX:-ghcr.io/wzshiming/fake-kubelet}"
   IMAGE_ETCD="${IMAGE_ETCD:-${KUBE_IMAGE_PREFIX}/etcd:${ETCD_VERSION}}"
@@ -611,6 +613,7 @@ function create_cluster() {
   local admin_key=""
   local ca_crt=""
   local mock_content=""
+  local up_args=()
   local i
 
   mkdir -p "${tmpdir}" "${etcddir}"
@@ -639,8 +642,12 @@ function create_cluster() {
   # Create cluster compose
   build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
 
+  if is_true "${QUIET_PULL}"; then
+    up_args+=("--quiet-pull")
+  fi
+
   # Start cluster with compose
-  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d "${up_args[@]}"
   if [[ "${?}" != 0 ]]; then
     echo "Failed create cluster"
     return 1
@@ -688,7 +695,7 @@ function create_cluster() {
     build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
 
     # Start cluster with compose
-    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d
+    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d "${up_args[@]}"
 
     echo "kubectl --context=${full_name} get node"
     kubectl --context="${full_name}" get node
@@ -758,6 +765,7 @@ function usage() {
   echo "  --node-name strings                        extra node name (default: '${NODE_NAME}')"
   echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
   echo "  --secure-port boolean                      use secure port (default: '${SECURE_PORT}')"
+  echo "  --quiet-pull boolean                       Pull without printing progress information (default: '${QUIET_PULL}')"
   echo "  --fake-version string                      version of the fake image (default: '${FAKE_VERSION}')"
   echo "  --kube-version string                      version of the kubernetes image (default: '${KUBE_VERSION}')"
   echo "  --etcd-version string                      version of the etcd image (default: '${ETCD_VERSION}')"
@@ -806,6 +814,9 @@ function main() {
       ;;
     --secure-port | --secure-port=*)
       [[ "${key#*=}" != "${key}" ]] && SECURE_PORT="${key#*=}" || { SECURE_PORT="${2}" && shift; }
+      ;;
+    --quiet-pull | --quiet-pull=*)
+      [[ "${key#*=}" != "${key}" ]] && QUIET_PULL="${key#*=}" || { QUIET_PULL="${2}" && shift; }
       ;;
     --fake-version | --fake-version=*)
       [[ "${key#*=}" != "${key}" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="${2}" && shift; }
