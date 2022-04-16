@@ -17,7 +17,7 @@ function init_global_flags() {
   GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
   NODE_NAME="${NODE_NAME:-}"
 
-  FAKE_VERSION="${FAKE_VERSION:-v0.4.0}"
+  FAKE_VERSION="${FAKE_VERSION:-v0.4.2}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
 
@@ -346,14 +346,14 @@ EOF
         {{ with .status }}
         addresses:
         {{ with .addresses }}
-        {{ . | YAML }}
+        {{ YAML . 1 }}
         {{ else }}
         - address: {{ NodeIP }}
           type: InternalIP
         {{ end }}
         allocatable:
         {{ with .allocatable }}
-        {{ . | YAML }}
+        {{ YAML . 1 }}
         {{ else }}
           cpu: 1k
           memory: 1Ti
@@ -361,7 +361,7 @@ EOF
         {{ end }}
         capacity:
         {{ with .capacity }}
-        {{ . | YAML }}
+        {{ YAML . 1 }}
         {{ else }}
           cpu: 1k
           memory: 1Ti
@@ -369,7 +369,7 @@ EOF
         {{ end }}
         daemonEndpoints:
         {{ with .daemonEndpoints }}
-        {{ . | YAML }}
+        {{ YAML . 1 }}
         {{ else }}
           kubeletEndpoint:
             Port: 0
