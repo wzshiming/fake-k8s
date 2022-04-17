@@ -49,6 +49,9 @@ EOF
     sleep 1
   done
 
+  echo kubectl --context="fake-k8s-${name}" config view --minify
+  kubectl --context="fake-k8s-${name}" config view --minify
+
   echo kubectl --context="fake-k8s-${name}" get pod
   kubectl --context="fake-k8s-${name}" get pod
 
