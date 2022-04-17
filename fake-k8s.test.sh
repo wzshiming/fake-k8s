@@ -20,9 +20,11 @@ releases=(
 function test_release() {
   local release="${1}"
   local name="cluster-${release//./-}"
+  local i
+
   ./fake-k8s.sh create --name "${name}" --kube-version "${release}" --quiet-pull
 
-  for _ in $(seq 1 30); do
+  for ((i = 0; i < 30; i++)); do
     kubectl --context="fake-k8s-${name}" apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
