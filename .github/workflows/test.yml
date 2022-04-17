@@ -24,3 +24,11 @@ jobs:
 
       - name: Run mock test
         run: ./fake-k8s.mock.test.sh
+
+  benchmark-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run benchmark test
+        run: ./fake-k8s.benchmark.test.sh
