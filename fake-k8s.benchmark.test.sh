@@ -24,14 +24,18 @@ function wait_resource() {
   local name="${1}"
   local reason="${2}"
   local want="${3}"
+  local raw
   local got
+  local all
   while true; do
-    got=$(kubectl --context=fake-k8s-default get "${name}" | grep -c "${reason}")
+    raw="$(kubectl --context=fake-k8s-default get --no-headers "${name}" 2>/dev/null)"
+    got=$(echo "${raw}" | grep -c "${reason}")
     if [ "${got}" -eq "${want}" ]; then
       echo "${name} ${got} done"
       break
     else
-      echo "${name} ${got}/${want}"
+      all=$(echo "${raw}" | wc -l)
+      echo "${name} ${got}/${all} => ${want}"
     fi
     sleep 1
   done
@@ -39,13 +43,13 @@ function wait_resource() {
 
 function gen_pods() {
   local size="${1}"
-  for ((i = 0; i < ${size}; i++)); do
+  for ((i = 0; i < "${size}"; i++)); do
     cat <<EOF
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  generateName: fake-pod-
+  name: fake-pod-${i}
   namespace: default
   labels:
     app: fake-pod
@@ -80,17 +84,17 @@ failed=()
 ./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull -r 1
 
 echo "=== Test create pod ==="
-child_timeout 30 test_create_pod 1000 || failed+=("test_create_pod_timeout")
+child_timeout 120 test_create_pod 10000 || failed+=("test_create_pod_timeout")
 
 echo "=== Test delete pod ==="
-child_timeout 30 test_delete_pod 0 || failed+=("test_delete_pod_timeout")
+child_timeout 120 test_delete_pod 0 || failed+=("test_delete_pod_timeout")
 
 ./fake-k8s.sh delete
 
-./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull -r 1000
+./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull -r 10000
 
 echo "=== Test create node ==="
-child_timeout 30 test_create_node 1000 || failed+=("test_create_node_timeout")
+child_timeout 120 test_create_node 10000 || failed+=("test_create_node_timeout")
 
 ./fake-k8s.sh delete
 
