@@ -85,6 +85,8 @@ child_timeout 30 test_create_pod 1000 || failed+=("test_create_pod_timeout")
 echo "=== Test delete pod ==="
 child_timeout 30 test_delete_pod 0 || failed+=("test_delete_pod_timeout")
 
+./fake-k8s.sh delete
+
 ./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull -r 1000
 
 echo "=== Test create node ==="
