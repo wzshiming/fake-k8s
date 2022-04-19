@@ -344,6 +344,7 @@ EOF
           name: {{ .metadata.name }}
       NODE_INITIALIZATION_TEMPLATE: |-
         {{ with .status }}
+
         addresses:
         {{ with .addresses }}
         {{ YAML . 1 }}
@@ -351,6 +352,7 @@ EOF
         - address: {{ NodeIP }}
           type: InternalIP
         {{ end }}
+
         allocatable:
         {{ with .allocatable }}
         {{ YAML . 1 }}
@@ -359,6 +361,7 @@ EOF
           memory: 1Ti
           pods: 1M
         {{ end }}
+
         capacity:
         {{ with .capacity }}
         {{ YAML . 1 }}
@@ -367,51 +370,23 @@ EOF
           memory: 1Ti
           pods: 1M
         {{ end }}
-        daemonEndpoints:
-        {{ with .daemonEndpoints }}
-        {{ YAML . 1 }}
-        {{ else }}
-          kubeletEndpoint:
-            Port: 0
-        {{ end }}
+
+        {{ with .nodeInfo }}
         nodeInfo:
-        {{ with .nodeInfo.architecture }}
-          architecture: {{ . }}
-        {{ else }}
-          architecture: amd64
+          architecture: {{ with .architecture }} {{ . }} {{ else }} "amd64" {{ end }}
+          bootID: {{ with .bootID }} {{ . }} {{ else }} "" {{ end }}
+          containerRuntimeVersion: {{ with .containerRuntimeVersion }} {{ . }} {{ else }} "" {{ end }}
+          kernelVersion: {{ with .kernelVersion }} {{ . }} {{ else }} "" {{ end }}
+          kubeProxyVersion: {{ with .kubeProxyVersion }} {{ . }} {{ else }} "fake" {{ end }}
+          kubeletVersion: {{ with .kubeletVersion }} {{ . }} {{ else }} "fake" {{ end }}
+          machineID: {{ with .machineID }} {{ . }} {{ else }} "" {{ end }}
+          operatingSystem: {{ with .operatingSystem }} {{ . }} {{ else }} "linux" {{ end }}
+          osImage: {{ with .osImage }} {{ . }} {{ else }} "" {{ end }}
+          systemUUID: {{ with .osImage }} {{ . }} {{ else }} "" {{ end }}
         {{ end }}
-        {{ with .nodeInfo.bootID }}
-          bootID: {{ . }}
-        {{ end }}
-        {{ with .nodeInfo.containerRuntimeVersion }}
-          containerRuntimeVersion: {{ . }}
-        {{ end }}
-        {{ with .nodeInfo.kernelVersion }}
-          kernelVersion: {{ . }}
-        {{ end }}
-        {{ with .nodeInfo.kubeProxyVersion }}
-          kubeProxyVersion: {{ . }}
-        {{ end }}
-        {{ with .nodeInfo.kubeletVersion }}
-          kubeletVersion: {{ . }}
-        {{ else }}
-          kubeletVersion: fake
-        {{ end }}
-        {{ with .nodeInfo.machineID }}
-          machineID: {{ . }}
-        {{ end }}
-        {{ with .nodeInfo.operatingSystem }}
-          operatingSystem: {{ . }}
-        {{ else }}
-          operatingSystem: Linux
-        {{ end }}
-        {{ with .nodeInfo.osImage }}
-          osImage: {{ . }}
-        {{ end }}
-        {{ with .nodeInfo.systemUUID }}
-          systemUUID: {{ . }}
-        {{ end }}
+
         phase: Running
+
         {{ end }}
 configs:
   kubeconfig:
