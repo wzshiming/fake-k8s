@@ -518,6 +518,16 @@ function detection_runtime() {
   fi
 }
 
+# output logs to stderr
+function log() {
+  echo "${*}" >&2
+}
+
+# output error logs to stderr
+function error() {
+  echo "Error: ${*}" >&2
+}
+
 # import to cluster from given resource and modify the resource uid
 function mock_cluster() {
   local kubeconfig="${1}"
@@ -548,7 +558,7 @@ function mock_cluster() {
   apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
   other_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences != null )')"
 
-  echo "Importing mock data" >&2
+  log "Importing mock data"
 
   while [[ "${apply_resource}" != "" ]]; do
     line_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -f - -o go-template='{{ range .items }}{{ .metadata.uid }} {{ .apiVersion }} {{ .kind }} {{ .metadata.name }} {{ with .metadata.namespace }}{{ . }}{{ end }}{{"\n"}}{{- end }}')"
@@ -557,7 +567,7 @@ function mock_cluster() {
       if [[ "${resource_uid}" == "" ]]; then
         continue
       fi
-      echo "Imported ${resource_kind} ${resource_name}" >&2
+      log "Imported ${resource_kind} ${resource_name}"
       if [[ "${resource_namespace}" == "" ]]; then
         next_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == \"${resource_version}\" and .metadata.ownerReferences[0].kind == \"${resource_kind}\" and .metadata.ownerReferences[0].name == \"${resource_name}\" )")"
       else
@@ -585,9 +595,6 @@ function mock_cluster() {
 function create_cluster() {
   local name="${1}"
   local port="${2}"
-  if [[ "${port}" == "random" || "${port}" == "" ]]; then
-    port="$(unusad_port)"
-  fi
   local full_name="${PROJECT_NAME}-${name}"
   local tmpdir="${TMPDIR}/clusters/${name}"
   local pkidir="${TMPDIR}/pki"
@@ -600,13 +607,38 @@ function create_cluster() {
   local up_args=()
   local i
 
+  if [[ -f "${tmpdir}/kubeconfig.yaml" ]]; then
+    log "kubectl --context=${full_name} get node"
+    kubectl --context="${full_name}" get node >&2
+    error "Cluster ${name} already exists"
+    return 1
+  fi
+
+  # Checking dependent Installation
+  if is_true "${SECURE_PORT}"; then
+    if ! command_exist openssl; then
+      error "OpenSSL needs to be installed with --secure-port=true"
+      return 1
+    fi
+  fi
+  if [[ "${MOCK}" != "" ]]; then
+    if ! command_exist kubectl; then
+      error "Kubectl needs to be installed with --mock"
+      return 1
+    fi
+    if ! command_exist jq; then
+      error "JQ needs to be installed with --mock"
+      return 1
+    fi
+  fi
+
+  if [[ "${port}" == "random" || "${port}" == "" ]]; then
+    port="$(unusad_port)"
+  fi
+
   mkdir -p "${tmpdir}" "${etcddir}"
 
   if is_true "${SECURE_PORT}"; then
-    if ! command_exist openssl; then
-      echo "OpenSSL needs to be installed"
-      return 1
-    fi
     # generate pki
     mkdir -p "${pkidir}"
     gen_cert "${pkidir}"
@@ -633,7 +665,7 @@ function create_cluster() {
   # Start cluster with compose
   "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d "${up_args[@]}"
   if [[ "${?}" != 0 ]]; then
-    echo "Failed create cluster"
+    error "Failed create cluster ${name}"
     return 1
   fi
 
@@ -642,24 +674,15 @@ function create_cluster() {
     set_default_kubeconfig "${full_name}" "${port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >/dev/null 2>&1
 
     # Wait for apiserver to be ready
-    echo "kubectl --context=${full_name} get node"
+    log "kubectl --context=${full_name} get node"
     for ((i = 0; i < 10; i++)); do
       kubectl --context="${full_name}" get node >/dev/null 2>&1 && break
       sleep 1
     done
-    kubectl --context="${full_name}" get node
+    kubectl --context="${full_name}" get node >&2
   fi
 
   if [[ "${MOCK}" != "" ]]; then
-    if ! command_exist kubectl; then
-      echo "Kubectl needs to be installed"
-      return 1
-    fi
-    if ! command_exist jq; then
-      echo "JQ needs to be installed"
-      return 1
-    fi
-
     # Stop kube-controller-manager and import mock data
     "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
     mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK}"
@@ -670,14 +693,14 @@ function create_cluster() {
     # Start cluster with compose
     "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d "${up_args[@]}"
 
-    echo "kubectl --context=${full_name} get node"
-    kubectl --context="${full_name}" get node
+    log "kubectl --context=${full_name} get node"
+    kubectl --context="${full_name}" get node >&2
   fi
 
   if ! command_exist kubectl; then
-    echo "kubeconfig is available at ${tmpdir}/kubeconfig.yaml"
+    log "kubeconfig is available at ${tmpdir}/kubeconfig.yaml"
   fi
-  echo "Created cluster ${full_name}."
+  log "Created cluster ${name}"
 }
 
 # delete a cluster
@@ -698,7 +721,7 @@ function delete_cluster() {
   fi
 
   rm -rf "${tmpdir}"
-  echo "Deleted cluster ${full_name}."
+  log "Deleted cluster ${name}"
 }
 
 # list all clusters
@@ -856,6 +879,7 @@ function main() {
     ;;
   *)
     usage
+    error "Unknown command ${command}"
     return 1
     ;;
   esac
