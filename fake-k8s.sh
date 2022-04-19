@@ -519,81 +519,66 @@ function detection_runtime() {
 }
 
 # import to cluster from given resource and modify the resource uid
-function mock_resource() {
+function mock_cluster() {
   local kubeconfig="${1}"
-  local resource="${2}"
-  local other_resource="${3}"
+  local mock="${2}"
+  local resources
+  local line_resource
+  local other_resource
   local apply_resource
-  local new_resource
+  local next_resource
   local resource_old_uid
   local resource_uid
   local resource_version
   local resource_kind
   local resource_name
   local resource_namespace
-  local item
-  if [[ "${resource}" == "" ]]; then
-    return
+
+  # take content from the file or stdin
+  if [[ "${mock}" == "-" ]]; then
+    resources="$(cat)"
+  else
+    resources="$(cat "${mock}")"
   fi
-  echo "${resource}" | jq -r '"Imported \(.kind) \(.metadata.name)"'
-
-  if [[ "${other_resource}" == "" ]]; then
-    return
+  if [[ "$(echo "${resources}" | jq -r '.kind')" == "List" ]]; then
+    resources="$(echo "${resources}" | jq '.items | .[]')"
   fi
-
-  for resource_uid in $(echo "${resource}" | jq '.metadata.uid'); do
-    item="$(echo "${resource}" | jq "select( .metadata.uid == ${resource_uid} )")"
-    resource_version="$(echo "${item}" | jq '.apiVersion')"
-    resource_kind="$(echo "${item}" | jq '.kind')"
-    resource_name="$(echo "${item}" | jq '.metadata.name')"
-    resource_namespace="$(echo "${item}" | jq '.metadata.namespace')"
-
-    if [[ "${resource_namespace}" == "null" ]]; then
-      apply_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == ${resource_version} and .metadata.ownerReferences[0].kind == ${resource_kind} and .metadata.ownerReferences[0].name == ${resource_name} )")"
-    else
-      apply_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == ${resource_version} and .metadata.ownerReferences[0].kind == ${resource_kind} and .metadata.ownerReferences[0].name == ${resource_name} and .metadata.namespace == ${resource_namespace} )")"
-    fi
-
-    if [[ "${apply_resource}" == "" ]]; then
-      continue
-    fi
-
-    resource_old_uid="$(echo "${apply_resource}" | jq '.metadata.ownerReferences[0].uid' | head -n 1)"
-    new_resource="$(echo "${apply_resource//${resource_old_uid}/${resource_uid}}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -o json -f -)"
-    if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
-      new_resource="$(echo "${new_resource}" | jq '.items | .[]')"
-    fi
-    if [[ "${new_resource}" == "" ]]; then
-      continue
-    fi
-
-    if [[ "${resource_namespace}" == "null" ]]; then
-      other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != ${resource_version} or .metadata.ownerReferences[0].kind != ${resource_kind} or .metadata.ownerReferences[0].name != ${resource_name} )")"
-    else
-      other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != ${resource_version} or .metadata.ownerReferences[0].kind != ${resource_kind} or .metadata.ownerReferences[0].name != ${resource_name} or .metadata.namespace != ${resource_namespace} )")"
-    fi
-
-    mock_resource "${kubeconfig}" "${new_resource}" "${other_resource}"
-  done
-}
-
-# import to cluster from given resource
-function mock_cluster() {
-  local kubeconfig="${1}"
-  local resources="${2}"
-  local new_resource
-  local other_resource
-  local apply_resource
 
   resources="$(echo "${resources}" | jq 'select( .kind != "Namespace" or ( .metadata.name != "kube-public" and .metadata.name != "kube-node-lease" and .metadata.name != "kube-system" and .metadata.name != "default" ) )')"
-  resources="$(echo "${resources}" | jq 'del( .metadata.uid )')"
   apply_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences == null )')"
-  new_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -o json -f -)"
-  if [[ "$(echo "${new_resource}" | jq -r '.kind')" == "List" ]]; then
-    new_resource="$(echo "${new_resource}" | jq '.items | .[]')"
-  fi
   other_resource="$(echo "${resources}" | jq 'select( .metadata.ownerReferences != null )')"
-  mock_resource "${kubeconfig}" "${new_resource}" "${other_resource}"
+
+  echo "Importing mock data" >&2
+
+  while [[ "${apply_resource}" != "" ]]; do
+    line_resource="$(echo "${apply_resource}" | kubectl --kubeconfig="${kubeconfig}" apply --validate=false --force -f - -o go-template='{{ range .items }}{{ .metadata.uid }} {{ .apiVersion }} {{ .kind }} {{ .metadata.name }} {{ with .metadata.namespace }}{{ . }}{{ end }}{{"\n"}}{{- end }}')"
+    apply_resource=""
+    while read -r resource_uid resource_version resource_kind resource_name resource_namespace; do
+      if [[ "${resource_uid}" == "" ]]; then
+        continue
+      fi
+      echo "Imported ${resource_kind} ${resource_name}" >&2
+      if [[ "${resource_namespace}" == "" ]]; then
+        next_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == \"${resource_version}\" and .metadata.ownerReferences[0].kind == \"${resource_kind}\" and .metadata.ownerReferences[0].name == \"${resource_name}\" )")"
+      else
+        next_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion == \"${resource_version}\" and .metadata.ownerReferences[0].kind == \"${resource_kind}\" and .metadata.ownerReferences[0].name == \"${resource_name}\" and .metadata.namespace == \"${resource_namespace}\" )")"
+      fi
+
+      if [[ "${next_resource}" == "" ]]; then
+        continue
+      fi
+
+      if [[ "${resource_namespace}" == "" ]]; then
+        other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != \"${resource_version}\" or .metadata.ownerReferences[0].kind != \"${resource_kind}\" or .metadata.ownerReferences[0].name != \"${resource_name}\" )")"
+      else
+        other_resource="$(echo "${other_resource}" | jq "select( .metadata.ownerReferences[0].apiVersion != \"${resource_version}\" or .metadata.ownerReferences[0].kind != \"${resource_kind}\" or .metadata.ownerReferences[0].name != \"${resource_name}\" or .metadata.namespace != \"${resource_namespace}\" )")"
+      fi
+
+      resource_old_uid="$(echo "${next_resource}" | jq -r '.metadata.ownerReferences[0].uid' | head -n 1)"
+      apply_resource+="${next_resource//${resource_old_uid}/${resource_uid}}"
+
+    done < <(echo "${line_resource}")
+  done
 }
 
 # create a cluster
@@ -676,20 +661,9 @@ function create_cluster() {
       return 1
     fi
 
-    # take content from the file or stdin
-    if [[ "${MOCK}" == "-" ]]; then
-      mock_content="$(cat)"
-    else
-      mock_content="$(cat "${MOCK}")"
-    fi
-    if [[ "$(echo "${mock_content}" | jq -r '.kind')" == "List" ]]; then
-      mock_content="$(echo "${mock_content}" | jq '.items | .[]')"
-    fi
-
     # Stop kube-controller-manager and import mock data
-    echo "Importing mock data"
     "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
-    mock_cluster "${tmpdir}/kubeconfig.yaml" "${mock_content}"
+    mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK}"
 
     # Recreate fake-kubelet
     build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
