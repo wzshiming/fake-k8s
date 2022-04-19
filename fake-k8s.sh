@@ -597,7 +597,6 @@ function create_cluster() {
   local admin_crt=""
   local admin_key=""
   local ca_crt=""
-  local mock_content=""
   local up_args=()
   local i
 
