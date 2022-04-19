@@ -1,6 +1,6 @@
 # fake-k8s
 
-fake-k8s is a tool for running Fake Kubernetes clusters using Docker.
+fake-k8s is a tool for running Fake Kubernetes clusters using Docker/Nerdctl.
 
 ## Usage
 
