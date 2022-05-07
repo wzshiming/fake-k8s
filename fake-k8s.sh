@@ -419,7 +419,7 @@ function gen_cert() {
     openssl genrsa -out "${dir}/ca.key" 2048
   fi
   if [[ ! -f "${dir}/ca.crt" ]]; then
-    openssl req -x509 -new -nodes -key "${dir}/ca.key" -subj "/CN=fake-ca" -out "${dir}/ca.crt" -days 36500
+    openssl req -sha256 -x509 -new -nodes -key "${dir}/ca.key" -subj "/CN=fake-ca" -out "${dir}/ca.crt" -days 36500
   fi
 
   # Generate the admin private key and certificate signing request and sign it with the ca.
@@ -448,7 +448,7 @@ EOF
     if [[ ! -f "${dir}/admin.csr" ]]; then
       openssl req -new -key "${dir}/admin.key" -subj "/CN=fake-admin" -out "${dir}/admin.csr" -config "${dir}/openssl.cnf"
     fi
-    openssl x509 -req -in "${dir}/admin.csr" -CA "${dir}/ca.crt" -CAkey "${dir}/ca.key" -CAcreateserial -out "${dir}/admin.crt" -days 36500 -extensions v3_req -extfile "${dir}/openssl.cnf"
+    openssl x509 -sha256 -req -in "${dir}/admin.csr" -CA "${dir}/ca.crt" -CAkey "${dir}/ca.key" -CAcreateserial -out "${dir}/admin.crt" -days 36500 -extensions v3_req -extfile "${dir}/openssl.cnf"
   fi
 }
 
