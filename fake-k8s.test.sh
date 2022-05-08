@@ -21,9 +21,10 @@ releases=(
 function test_release() {
   local release="${1}"
   local name="cluster-${release//./-}"
+  local targets
   local i
 
-  ./fake-k8s.sh create --name "${name}" --kube-version "${release}" --quiet-pull
+  ./fake-k8s.sh create --name "${name}" --kube-version "${release}" --quiet-pull --prometheus-port 9090
 
   for ((i = 0; i < 30; i++)); do
     kubectl --context="fake-k8s-${name}" apply -f - <<EOF
@@ -58,11 +59,23 @@ EOF
   echo kubectl --context="fake-k8s-${name}" get pod
   kubectl --context="fake-k8s-${name}" get pod
 
-  if kubectl --context="fake-k8s-${name}" get pod | grep Running >/dev/null 2>&1; then
-    echo "=== release ${release} is works ==="
-  else
+  if ! kubectl --context="fake-k8s-${name}" get pod | grep Running >/dev/null 2>&1; then
     echo "=== release ${release} is not works ==="
-    failed+=("${release}")
+    failed+=("${release}_not_works")
+  fi
+
+  for ((i = 0; i < 30; i++)); do
+    targets="$(curl -s http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.health) \(.scrapePool)"')"
+    if [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "5" ]]; then
+      break
+    fi
+    sleep 1
+  done
+
+  echo "${targets}"
+  if ! [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "5" ]]; then
+    echo "=== prometheus of release ${release} is not works ==="
+    failed+=("${release}_prometheus_not_works")
   fi
 
   ./fake-k8s.sh delete -n "${name}" >/dev/null 2>&1 &

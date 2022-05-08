@@ -17,9 +17,12 @@ function init_global_flags() {
   GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
   NODE_NAME="${NODE_NAME:-}"
 
+  PROMETHEUS_PORT="${PROMETHEUS_PORT:-0}"
+
   FAKE_VERSION="${FAKE_VERSION:-v0.6.0}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
+  PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-v2.35.0}"
 
   # kubernetes v1.20 secure port must be enabled
   if [[ "$(get_release_version "${KUBE_VERSION}")" -ge "20" ]]; then
@@ -32,11 +35,13 @@ function init_global_flags() {
 
   KUBE_IMAGE_PREFIX="${KUBE_IMAGE_PREFIX:-k8s.gcr.io}"
   FAKE_IMAGE_PREFIX="${FAKE_IMAGE_PREFIX:-ghcr.io/wzshiming/fake-kubelet}"
+  PROMETHEUS_IMAGE_PREFIX="${PROMETHEUS_IMAGE_PREFIX:-docker.io/prom}"
   IMAGE_ETCD="${IMAGE_ETCD:-${KUBE_IMAGE_PREFIX}/etcd:${ETCD_VERSION}}"
   IMAGE_KUBE_APISERVER="${IMAGE_KUBE_APISERVER:-${KUBE_IMAGE_PREFIX}/kube-apiserver:${KUBE_VERSION}}"
   IMAGE_KUBE_CONTROLLER_MANAGER="${IMAGE_KUBE_CONTROLLER_MANAGER:-${KUBE_IMAGE_PREFIX}/kube-controller-manager:${KUBE_VERSION}}"
   IMAGE_KUBE_SCHEDULER="${IMAGE_KUBE_SCHEDULER:-${KUBE_IMAGE_PREFIX}/kube-scheduler:${KUBE_VERSION}}"
   IMAGE_FAKE_KUBELET="${IMAGE_FAKE_KUBELET:-${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}}"
+  IMAGE_PROMETHEUS="${IMAGE_PROMETHEUS:-${PROMETHEUS_IMAGE_PREFIX}/prometheus:${PROMETHEUS_VERSION}}"
 }
 
 # Etcd version of each kubernetes version
@@ -175,6 +180,124 @@ EOF
   fi
 }
 
+# build prometheus config file with given context
+function build_prometheus_config() {
+  local name="${1}"
+  local secure="${2}"
+  local admin_crt_path="/etc/kubernetes/pki/admin.crt"
+  local admin_key_path="/etc/kubernetes/pki/admin.key"
+  local ca_crt_path="/etc/kubernetes/pki/ca.crt"
+
+  cat <<EOF
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+alerting:
+  alertmanagers:
+  - follow_redirects: true
+    enable_http2: true
+    scheme: http
+    timeout: 10s
+    api_version: v2
+    static_configs:
+    - targets: []
+scrape_configs:
+- job_name: "prometheus"
+  scheme: http
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  static_configs:
+  - targets:
+    - localhost:9090
+- job_name: "etcd"
+  scheme: http
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  static_configs:
+  - targets:
+    - "${name}-etcd:2379"
+EOF
+
+  if is_true "${secure}"; then
+    cat <<EOF
+- job_name: "kube-apiserver"
+  scheme: https
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  tls_config:
+    cert_file: "${admin_crt_path}"
+    key_file: "${admin_key_path}"
+    insecure_skip_verify: true
+  static_configs:
+  - targets:
+    - "${name}-kube-apiserver:6443"
+- job_name: "kube-controller-manager"
+  scheme: https
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  tls_config:
+    cert_file: "${admin_crt_path}"
+    key_file: "${admin_key_path}"
+    insecure_skip_verify: true
+  static_configs:
+  - targets:
+    - "${name}-kube-controller-manager:10257"
+- job_name: "kube-scheduler"
+  scheme: https
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  tls_config:
+    cert_file: "${admin_crt_path}"
+    key_file: "${admin_key_path}"
+    insecure_skip_verify: true
+  static_configs:
+  - targets:
+    - "${name}-kube-scheduler:10259"
+EOF
+  else
+    cat <<EOF
+- job_name: "kube-apiserver"
+  scheme: http
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  static_configs:
+  - targets:
+    - "${name}-kube-apiserver:8080"
+- job_name: "kube-controller-manager"
+  scheme: http
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  static_configs:
+  - targets:
+    - "${name}-kube-controller-manager:10252"
+- job_name: "kube-scheduler"
+  scheme: http
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  static_configs:
+  - targets:
+    - "${name}-kube-scheduler:10251"
+EOF
+  fi
+}
+
 # build the docker-compose file with the given context
 function build_compose() {
   local name="${1}"
@@ -184,10 +307,49 @@ function build_compose() {
   local admin_crt_path="${5}"
   local admin_key_path="${6}"
   local ca_crt_path="${7}"
+  local prometheus_path="${8}"
 
   cat <<EOF
 version: "3.1"
 services:
+EOF
+
+  # Prometheus
+  if [[ "${prometheus_path}" != "" ]]; then
+    cat <<EOF
+  prometheus:
+    container_name: "${name}-prometheus"
+    image: ${IMAGE_PROMETHEUS}
+    restart: unless-stopped
+    links:
+      - kube_controller_manager
+      - kube_scheduler
+      - kube_apiserver
+      - etcd
+      - fake_kubelet
+    command:
+      - --config.file
+      - /etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+    configs:
+      - source: prometheus
+        target: /etc/prometheus/prometheus.yml
+EOF
+    if [[ "${admin_key_path}" != "" ]]; then
+      cat <<EOF
+      - source: admin-crt
+        target: /etc/kubernetes/pki/admin.crt
+      - source: admin-key
+        target: /etc/kubernetes/pki/admin.key
+      - source: ca-crt
+        target: /etc/kubernetes/pki/ca.crt
+EOF
+    fi
+  fi
+
+  # Etcd
+  cat <<EOF
   etcd:
     container_name: "${name}-etcd"
     image: ${IMAGE_ETCD}
@@ -210,6 +372,10 @@ services:
       - node0=http://0.0.0.0:2380
     volumes:
       - ${etcd_data}:/etcd-data:rw
+EOF
+
+  # Kube-apiserver
+  cat <<EOF
   kube_apiserver:
     container_name: "${name}-kube-apiserver"
     image: ${IMAGE_KUBE_APISERVER}
@@ -218,7 +384,6 @@ services:
       - etcd
     ports:
 EOF
-
   if [[ "${admin_key_path}" != "" ]]; then
     cat <<EOF
       - ${port}:6443
@@ -228,7 +393,6 @@ EOF
       - ${port}:8080
 EOF
   fi
-
   cat <<EOF
     command:
       - kube-apiserver
@@ -278,35 +442,84 @@ EOF
 EOF
   fi
 
+  # Kube-controller-manager
   cat <<EOF
   kube_controller_manager:
     container_name: "${name}-kube-controller-manager"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
     restart: unless-stopped
+    links:
+      - kube_apiserver
     command:
       - kube-controller-manager
       - --kubeconfig
       - /root/.kube/config
-    links:
-      - kube_apiserver
+EOF
+  if [[ "${prometheus_path}" != "" ]]; then
+    if [[ "${admin_key_path}" != "" ]]; then
+      cat <<EOF
+      - --bind-address
+      - 0.0.0.0
+      - --secure-port
+      - "10257"
+      - --authorization-always-allow-paths
+      - /healthz,/metrics
+EOF
+    else
+      cat <<EOF
+      - --address
+      - 0.0.0.0
+      - --port
+      - "10252"
+EOF
+    fi
+  fi
+  cat <<EOF
     configs:
       - source: kubeconfig
         target: /root/.kube/config
+EOF
 
+  # Kube-scheduler
+  cat <<EOF
   kube_scheduler:
     container_name: "${name}-kube-scheduler"
     image: ${IMAGE_KUBE_SCHEDULER}
     restart: unless-stopped
+    links:
+      - kube_apiserver
     command:
       - kube-scheduler
       - --kubeconfig
       - /root/.kube/config
-    links:
-      - kube_apiserver
+EOF
+  if [[ "${prometheus_path}" != "" ]]; then
+    if [[ "${admin_key_path}" != "" ]]; then
+      cat <<EOF
+      - --bind-address
+      - 0.0.0.0
+      - --secure-port
+      - "10259"
+      - --authorization-always-allow-paths
+      - /healthz,/metrics
+EOF
+    else
+      cat <<EOF
+      - --address
+      - 0.0.0.0
+      - --port
+      - "10251"
+EOF
+    fi
+  fi
+  cat <<EOF
     configs:
       - source: kubeconfig
         target: /root/.kube/config
+EOF
 
+  # Fake-kubelet
+  cat <<EOF
   fake_kubelet:
     container_name: "${name}-fake-kubelet"
     image: ${IMAGE_FAKE_KUBELET}
@@ -388,6 +601,10 @@ EOF
         phase: Running
 
         {{ end }}
+EOF
+
+  # Config files
+  cat <<EOF
 configs:
   kubeconfig:
     file: ${kubeconfig_path}
@@ -403,6 +620,14 @@ EOF
     file: ${ca_crt_path}
 EOF
   fi
+  if [[ "${prometheus_path}" != "" ]]; then
+    cat <<EOF
+  prometheus:
+    file: ${prometheus_path}
+EOF
+  fi
+
+  # Network
   cat <<EOF
 networks:
   default:
@@ -456,6 +681,10 @@ EOF
     fi
     openssl x509 -sha256 -req -in "${admin_csr_path}" -CA "${ca_crt_path}" -CAkey "${ca_key_path}" -CAcreateserial -out "${admin_crt_path}" -days 36500 -extensions v3_req -extfile "${openssl_conf_path}"
   fi
+
+  # Because we have no right to read this content in the Prometheus container,
+  # this is just a local key, it doesn't matter if it is leaked.
+  chmod 0644 "${dir}"/*.key
 }
 
 # set the context in default kubeconfig
@@ -585,6 +814,7 @@ function create_cluster() {
   local admin_crt_path=""
   local admin_key_path=""
   local ca_crt_path=""
+  local prometheus_path=""
   local in_cluster_kubeconfig_path="${tmpdir}/kubeconfig"
   local local_kubeconfig_path="${tmpdir}/kubeconfig.yaml"
   local docker_compose_path="${tmpdir}/docker-compose.yaml"
@@ -639,8 +869,14 @@ function create_cluster() {
   # Create local kubeconfig
   build_kubeconfig "${scheme}://127.0.0.1:${port}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >"${local_kubeconfig_path}"
 
+  if [[ "${PROMETHEUS_PORT}" -gt 0 ]]; then
+    # Create cluster prometheus config
+    build_prometheus_config "${full_name}" "${SECURE_PORT}" >"${tmpdir}/prometheus.yaml"
+    prometheus_path="${tmpdir}/prometheus.yaml"
+  fi
+
   # Create cluster compose
-  build_compose "${full_name}" "${port}" "${in_cluster_kubeconfig_path}" "${etcddir}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >"${docker_compose_path}"
+  build_compose "${full_name}" "${port}" "${in_cluster_kubeconfig_path}" "${etcddir}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" "${prometheus_path}" >"${docker_compose_path}"
 
   if is_true "${QUIET_PULL}"; then
     up_args+=("--quiet-pull")
@@ -725,6 +961,7 @@ function images() {
   echo "${IMAGE_KUBE_CONTROLLER_MANAGER}"
   echo "${IMAGE_KUBE_SCHEDULER}"
   echo "${IMAGE_FAKE_KUBELET}"
+  echo "${IMAGE_PROMETHEUS}"
 }
 
 # usage info
@@ -747,16 +984,20 @@ function usage() {
   echo "  --runtime string                           runtime to use (default: '${RUNTIME}')"
   echo "  --secure-port                              use secure port"
   echo "  --quiet-pull                               pull without printing progress information"
+  echo "  --prometheus-port uint32                   port of the prometheus server (default: '${PROMETHEUS_PORT}')"
   echo "  --fake-version string                      version of the fake image (default: '${FAKE_VERSION}')"
   echo "  --kube-version string                      version of the kubernetes image (default: '${KUBE_VERSION}')"
   echo "  --etcd-version string                      version of the etcd image (default: '${ETCD_VERSION}')"
+  echo "  --prometheus-version string                version of the prometheus image (default: '${PROMETHEUS_VERSION}')"
   echo "  --kube-image-prefix string                 prefix of the kubernetes image (default: '${KUBE_IMAGE_PREFIX}')"
   echo "  --fake-image-prefix string                 prefix of the fake image (default: '${FAKE_IMAGE_PREFIX}')"
+  echo "  --prometheus-image-prefix string           prefix of the prometheus image (default: '${PROMETHEUS_IMAGE_PREFIX}')"
   echo "  --image-etcd string                        etcd image (default: '${IMAGE_ETCD}')"
   echo "  --image-kube-apiserver string              kube-apiserver image (default: '${IMAGE_KUBE_APISERVER}')"
   echo "  --image-kube-controller-manager string     kube-controller-manager image (default: '${IMAGE_KUBE_CONTROLLER_MANAGER}')"
   echo "  --image-kube-scheduler string              kube-scheduler image (default: '${IMAGE_KUBE_SCHEDULER}')"
   echo "  --image-fake-kubelet string                fake-kubelet image (default: '${IMAGE_FAKE_KUBELET}')"
+  echo "  --image-prometheus string                  prometheus image (default: '${IMAGE_PROMETHEUS}')"
 }
 
 function main() {
@@ -799,6 +1040,9 @@ function main() {
     --quiet-pull | --quiet-pull=*)
       [[ "${key#*=}" != "${key}" ]] && QUIET_PULL="${key#*=}" || QUIET_PULL="true"
       ;;
+    --prometheus-port | --prometheus-port=*)
+      [[ "${key#*=}" != "${key}" ]] && PROMETHEUS_PORT="${key#*=}" || { PROMETHEUS_PORT="${2}" && shift; }
+      ;;
     --fake-version | --fake-version=*)
       [[ "${key#*=}" != "${key}" ]] && FAKE_VERSION="${key#*=}" || { FAKE_VERSION="${2}" && shift; }
       ;;
@@ -808,11 +1052,17 @@ function main() {
     --etcd-version | --etcd-version=*)
       [[ "${key#*=}" != "${key}" ]] && ETCD_VERSION="${key#*=}" || { ETCD_VERSION="${2}" && shift; }
       ;;
+    --prometheus-version | --prometheus-version=*)
+      [[ "${key#*=}" != "${key}" ]] && PROMETHEUS_VERSION="${key#*=}" || { PROMETHEUS_VERSION="${2}" && shift; }
+      ;;
     --kube-image-prefix | --kube-image-prefix=*)
       [[ "${key#*=}" != "${key}" ]] && KUBE_IMAGE_PREFIX="${key#*=}" || { KUBE_IMAGE_PREFIX="${2}" && shift; }
       ;;
     --fake-image-prefix | --fake-image-prefix=*)
       [[ "${key#*=}" != "${key}" ]] && FAKE_IMAGE_PREFIX="${key#*=}" || { FAKE_IMAGE_PREFIX="${2}" && shift; }
+      ;;
+    --prometheus-image-prefix | --prometheus-image-prefix=*)
+      [[ "${key#*=}" != "${key}" ]] && PROMETHEUS_IMAGE_PREFIX="${key#*=}" || { PROMETHEUS_IMAGE_PREFIX="${2}" && shift; }
       ;;
     --image-etcd | --image-etcd=*)
       [[ "${key#*=}" != "${key}" ]] && IMAGE_ETCD="${key#*=}" || { IMAGE_ETCD="${2}" && shift; }
@@ -828,6 +1078,9 @@ function main() {
       ;;
     --image-fake-kubelet | --image-fake-kubelet=*)
       [[ "${key#*=}" != "${key}" ]] && IMAGE_FAKE_KUBELET="${key#*=}" || { IMAGE_FAKE_KUBELET="${2}" && shift; }
+      ;;
+    --image-prometheus | --image-prometheus=*)
+      [[ "${key#*=}" != "${key}" ]] && IMAGE_PROMETHEUS="${key#*=}" || { IMAGE_PROMETHEUS="${2}" && shift; }
       ;;
     -h | --help)
       usage
