@@ -250,22 +250,22 @@ EOF
       - --secure-port
       - "6443"
       - --tls-cert-file
-      - /etc/kubernetes/pki/apiserver.crt
+      - /etc/kubernetes/pki/admin.crt
       - --tls-private-key-file
-      - /etc/kubernetes/pki/apiserver.key
+      - /etc/kubernetes/pki/admin.key
       - --client-ca-file
       - /etc/kubernetes/pki/ca.crt
       - --service-account-key-file
-      - /etc/kubernetes/pki/apiserver.key
+      - /etc/kubernetes/pki/admin.key
       - --service-account-signing-key-file
-      - /etc/kubernetes/pki/apiserver.key
+      - /etc/kubernetes/pki/admin.key
       - --service-account-issuer
       - https://kubernetes.default.svc.cluster.local
     configs:
       - source: admin-crt
-        target: /etc/kubernetes/pki/apiserver.crt
+        target: /etc/kubernetes/pki/admin.crt
       - source: admin-key
-        target: /etc/kubernetes/pki/apiserver.key
+        target: /etc/kubernetes/pki/admin.key
       - source: ca-crt
         target: /etc/kubernetes/pki/ca.crt
 EOF
@@ -279,8 +279,8 @@ EOF
   fi
 
   cat <<EOF
-  kube_controller:
-    container_name: "${name}-kube-controller"
+  kube_controller_manager:
+    container_name: "${name}-kube-controller-manager"
     image: ${IMAGE_KUBE_CONTROLLER_MANAGER}
     restart: unless-stopped
     command:
@@ -659,7 +659,7 @@ function create_cluster() {
 
   if [[ "${MOCK}" != "" ]]; then
     # Stop kube-controller-manager and import mock data
-    "${RUNTIME}" stop "${full_name}-kube-controller" >/dev/null 2>&1
+    "${RUNTIME}" stop "${full_name}-kube-controller-manager" >/dev/null 2>&1
     mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK}"
 
     # Recreate fake-kubelet
