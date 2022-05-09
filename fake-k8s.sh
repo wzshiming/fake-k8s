@@ -413,22 +413,28 @@ EOF
 # Generate the certificates for the kube-apiserver.
 function gen_cert() {
   local dir="${1}"
+  local admin_crt_path="${dir}/admin.crt"
+  local admin_key_path="${dir}/admin.key"
+  local admin_csr_path="${dir}/admin.csr"
+  local ca_crt_path="${dir}/ca.crt"
+  local ca_key_path="${dir}/ca.key"
+  local openssl_conf_path="${dir}/openssl.cnf"
 
   # Generate the ca private key and certificate.
-  if [[ ! -f "${dir}/ca.key" ]]; then
-    openssl genrsa -out "${dir}/ca.key" 2048
+  if [[ ! -f "${ca_key_path}" ]]; then
+    openssl genrsa -out "${ca_key_path}" 2048
   fi
-  if [[ ! -f "${dir}/ca.crt" ]]; then
-    openssl req -sha256 -x509 -new -nodes -key "${dir}/ca.key" -subj "/CN=fake-ca" -out "${dir}/ca.crt" -days 36500
+  if [[ ! -f "${ca_crt_path}" ]]; then
+    openssl req -sha256 -x509 -new -nodes -key "${ca_key_path}" -subj "/CN=fake-ca" -out "${ca_crt_path}" -days 36500
   fi
 
   # Generate the admin private key and certificate signing request and sign it with the ca.
-  if [[ ! -f "${dir}/admin.key" ]]; then
-    openssl genrsa -out "${dir}/admin.key" 2048
+  if [[ ! -f "${admin_key_path}" ]]; then
+    openssl genrsa -out "${admin_key_path}" 2048
   fi
-  if [[ ! -f "${dir}/admin.crt" ]]; then
-    if [[ ! -f "${dir}/openssl.cnf" ]]; then
-      cat <<EOF >"${dir}/openssl.cnf"
+  if [[ ! -f "${admin_crt_path}" ]]; then
+    if [[ ! -f "${openssl_conf_path}" ]]; then
+      cat <<EOF >"${openssl_conf_path}"
 [req]
 req_extensions = v3_req
 distinguished_name = req_distinguished_name
@@ -445,10 +451,10 @@ DNS.4 = kubernetes.default.svc.cluster.local
 IP.1 = 127.0.0.1
 EOF
     fi
-    if [[ ! -f "${dir}/admin.csr" ]]; then
-      openssl req -new -key "${dir}/admin.key" -subj "/CN=fake-admin" -out "${dir}/admin.csr" -config "${dir}/openssl.cnf"
+    if [[ ! -f "${admin_csr_path}" ]]; then
+      openssl req -new -key "${admin_key_path}" -subj "/CN=fake-admin" -out "${admin_csr_path}" -config "${openssl_conf_path}"
     fi
-    openssl x509 -sha256 -req -in "${dir}/admin.csr" -CA "${dir}/ca.crt" -CAkey "${dir}/ca.key" -CAcreateserial -out "${dir}/admin.crt" -days 36500 -extensions v3_req -extfile "${dir}/openssl.cnf"
+    openssl x509 -sha256 -req -in "${admin_csr_path}" -CA "${ca_crt_path}" -CAkey "${ca_key_path}" -CAcreateserial -out "${admin_crt_path}" -days 36500 -extensions v3_req -extfile "${openssl_conf_path}"
   fi
 }
 
@@ -576,13 +582,16 @@ function create_cluster() {
   local etcddir="${tmpdir}/etcd"
   local scheme="http"
   local incluster_port="8080"
-  local admin_crt=""
-  local admin_key=""
-  local ca_crt=""
+  local admin_crt_path=""
+  local admin_key_path=""
+  local ca_crt_path=""
+  local in_cluster_kubeconfig_path="${tmpdir}/kubeconfig"
+  local local_kubeconfig_path="${tmpdir}/kubeconfig.yaml"
+  local docker_compose_path="${tmpdir}/docker-compose.yaml"
   local up_args=()
   local i
 
-  if [[ -f "${tmpdir}/kubeconfig.yaml" ]]; then
+  if [[ -f "${local_kubeconfig_path}" ]]; then
     log "kubectl --context=${full_name} get node"
     kubectl --context="${full_name}" get node >&2
     error "Cluster ${name} already exists"
@@ -617,28 +626,28 @@ function create_cluster() {
     # generate pki
     mkdir -p "${pkidir}"
     gen_cert "${pkidir}"
-    admin_crt="${pkidir}/admin.crt"
-    admin_key="${pkidir}/admin.key"
-    ca_crt="${pkidir}/ca.crt"
+    admin_crt_path="${pkidir}/admin.crt"
+    admin_key_path="${pkidir}/admin.key"
+    ca_crt_path="${pkidir}/ca.crt"
     scheme="https"
     incluster_port="6443"
   fi
 
   # Create in-cluster kubeconfig
-  build_kubeconfig "${scheme}://${full_name}-kube-apiserver:${incluster_port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/kubeconfig"
+  build_kubeconfig "${scheme}://${full_name}-kube-apiserver:${incluster_port}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >"${in_cluster_kubeconfig_path}"
 
   # Create local kubeconfig
-  build_kubeconfig "${scheme}://127.0.0.1:${port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/kubeconfig.yaml"
+  build_kubeconfig "${scheme}://127.0.0.1:${port}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >"${local_kubeconfig_path}"
 
   # Create cluster compose
-  build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
+  build_compose "${full_name}" "${port}" "${in_cluster_kubeconfig_path}" "${etcddir}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >"${docker_compose_path}"
 
   if is_true "${QUIET_PULL}"; then
     up_args+=("--quiet-pull")
   fi
 
   # Start cluster with compose
-  "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d "${up_args[@]}"
+  "${RUNTIME}" compose -p "${full_name}" -f "${docker_compose_path}" up -d "${up_args[@]}"
   if [[ "${?}" != 0 ]]; then
     error "Failed create cluster ${name}"
     return 1
@@ -646,7 +655,7 @@ function create_cluster() {
 
   if command_exist kubectl; then
     # Set up default kubeconfig
-    set_default_kubeconfig "${full_name}" "${port}" "${admin_crt}" "${admin_key}" "${ca_crt}" >/dev/null 2>&1
+    set_default_kubeconfig "${full_name}" "${port}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >/dev/null 2>&1
 
     # Wait for apiserver to be ready
     log "kubectl --context=${full_name} get node"
@@ -660,20 +669,20 @@ function create_cluster() {
   if [[ "${MOCK}" != "" ]]; then
     # Stop kube-controller-manager and import mock data
     "${RUNTIME}" stop "${full_name}-kube-controller-manager" >/dev/null 2>&1
-    mock_cluster "${tmpdir}/kubeconfig.yaml" "${MOCK}"
+    mock_cluster "${local_kubeconfig_path}" "${MOCK}"
 
     # Recreate fake-kubelet
-    build_compose "${full_name}" "${port}" "${tmpdir}/kubeconfig" "${etcddir}" "${admin_crt}" "${admin_key}" "${ca_crt}" >"${tmpdir}/docker-compose.yaml"
+    build_compose "${full_name}" "${port}" "${in_cluster_kubeconfig_path}" "${etcddir}" "${admin_crt_path}" "${admin_key_path}" "${ca_crt_path}" >"${docker_compose_path}"
 
     # Start cluster with compose
-    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" up -d "${up_args[@]}"
+    "${RUNTIME}" compose -p "${full_name}" -f "${docker_compose_path}" up -d "${up_args[@]}"
 
     log "kubectl --context=${full_name} get node"
     kubectl --context="${full_name}" get node >&2
   fi
 
   if ! command_exist kubectl; then
-    log "kubeconfig is available at ${tmpdir}/kubeconfig.yaml"
+    log "kubeconfig is available at ${local_kubeconfig_path}"
   fi
   log "Created cluster ${name}"
 }
@@ -683,14 +692,15 @@ function delete_cluster() {
   local name="${1}"
   local tmpdir="${TMPDIR}/clusters/${name}"
   local full_name="${PROJECT_NAME}-${name}"
+  local docker_compose_path="${tmpdir}/docker-compose.yaml"
 
   if command_exist kubectl; then
     unset_default_kubeconfig "${full_name}" >/dev/null 2>&1
   fi
 
-  if [[ -f "${tmpdir}/docker-compose.yaml" ]]; then
-    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" kill
-    "${RUNTIME}" compose -p "${full_name}" -f "${tmpdir}/docker-compose.yaml" down
+  if [[ -f "${docker_compose_path}" ]]; then
+    "${RUNTIME}" compose -p "${full_name}" -f "${docker_compose_path}" kill
+    "${RUNTIME}" compose -p "${full_name}" -f "${docker_compose_path}" down
   else
     "${RUNTIME}" compose -p "${full_name}" down
   fi
