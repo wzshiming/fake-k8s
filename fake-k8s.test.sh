@@ -66,14 +66,14 @@ EOF
 
   for ((i = 0; i < 30; i++)); do
     targets="$(curl -s http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.health) \(.scrapePool)"')"
-    if [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "5" ]]; then
+    if [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "6" ]]; then
       break
     fi
     sleep 1
   done
 
   echo "${targets}"
-  if ! [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "5" ]]; then
+  if ! [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "6" ]]; then
     echo "=== prometheus of release ${release} is not works ==="
     failed+=("${release}_prometheus_not_works")
   fi

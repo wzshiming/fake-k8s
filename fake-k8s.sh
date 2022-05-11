@@ -221,6 +221,15 @@ scrape_configs:
   static_configs:
   - targets:
     - "${name}-etcd:2379"
+- job_name: "fake-kubelet"
+  scheme: http
+  honor_timestamps: true
+  metrics_path: /metrics
+  follow_redirects: true
+  enable_http2: true
+  static_configs:
+  - targets:
+    - "${name}-fake-kubelet:8080"
 EOF
 
   if is_true "${secure}"; then
@@ -602,6 +611,11 @@ EOF
 
         {{ end }}
 EOF
+  if [[ "${prometheus_path}" != "" ]]; then
+    cat <<EOF
+      SERVER_ADDRESS: :8080
+EOF
+  fi
 
   # Config files
   cat <<EOF
