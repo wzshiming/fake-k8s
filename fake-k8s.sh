@@ -17,7 +17,7 @@ function init_global_flags() {
   GENERATE_NODE_NAME="${GENERATE_NODE_NAME:-fake-}"
   NODE_NAME="${NODE_NAME:-}"
 
-  FAKE_VERSION="${FAKE_VERSION:-v0.5.0}"
+  FAKE_VERSION="${FAKE_VERSION:-v0.6.0}"
   KUBE_VERSION="${KUBE_VERSION:-v1.19.16}"
   ETCD_VERSION="${ETCD_VERSION:-$(get_etcd_version "${KUBE_VERSION}")}"
 
