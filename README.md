@@ -2,6 +2,12 @@
 
 fake-k8s is a tool for running Fake Kubernetes clusters using Docker/Nerdctl.
 
+## Requirements
+
+- Docker or Nerdctl
+- Kubelet and JQ with --mock
+- OpenSSL with --kube-version greater than 1.19
+
 ## Usage
 
 ### Cteate cluster
