@@ -24,7 +24,7 @@ function test_release() {
   local targets
   local i
 
-  ./fake-k8s.sh create --name "${name}" --kube-version "${release}" --quiet-pull --prometheus-port 9090
+  KUBE_VERSION="${release}" ./fake-k8s create cluster --name "${name}" --quiet-pull --prometheus-port 9090
 
   for ((i = 0; i < 30; i++)); do
     kubectl --context="fake-k8s-${name}" apply -f - <<EOF
@@ -78,7 +78,7 @@ EOF
     failed+=("${release}_prometheus_not_works")
   fi
 
-  ./fake-k8s.sh delete -n "${name}" >/dev/null 2>&1 &
+  ./fake-k8s delete cluster --name "${name}" >/dev/null 2>&1 &
 }
 
 failed=()
