@@ -1,27 +1,29 @@
 # fake-k8s
 
-fake-k8s is a tool for running Fake Kubernetes clusters using Docker/Nerdctl.
+fake-k8s is a tool for running Fake Kubernetes clusters
+
+[The old version](https://github.com/wzshiming/fake-k8s/blob/v0.1.1/fake-k8s.sh) uses shell implementation and is no longer maintained
 
 ## Requirements
 
-- Docker or Nerdctl
-- Kubelet and JQ with --mock
-- OpenSSL with --kube-version greater than 1.19
+- Docker or Nerdctl or Kind or Binary
+- Kubectl
 
 ## Usage
 
 ### Cteate cluster
 
 ``` console
-./fake-k8s.sh create --name c1
-./fake-k8s.sh create --name c2
+fake-k8s create cluster --name c1
+fake-k8s create cluster --name c2
 ```
 
 ### Simulates the specified cluster
 
 ``` console
-kubectl get ns,node,statefulset,daemonset,deployment,replicaset,pod -A -o json > mock.json
-./fake-k8s.sh create --name m1 --mock mock.json
+kubectl get ns,node,statefulset,daemonset,deployment,replicaset,pod -A -o yaml > mock.yaml
+fake-k8s create cluster --name m1 --generate-replicas 0
+fake-k8s load resource --name m1 -f mock.yaml
 ```
 
 ### Get node of cluster
@@ -39,7 +41,7 @@ fake-4   Ready    agent   1s   fake
 ### List cluster
 
 ``` console
-./fake-k8s.sh list             
+fake-k8s get clusters             
 c1
 c2
 ```
@@ -47,23 +49,20 @@ c2
 ### Delete cluster
 
 ``` console
-./fake-k8s.sh delete --name c1
-./fake-k8s.sh delete --name c2
+fake-k8s delete cluster --name c1
+fake-k8s delete cluster --name c2
 ```
 
 ## Examples
 
 ``` console
-$ time fake-k8s.sh create
+$ time fake-k8s create cluster
 [+] Running 5/5
  ⠿ Container fake-k8s-default-etcd             Started                                                         1.7s
  ⠿ Container fake-k8s-default-kube-apiserver   Started                                                         1.7s
  ⠿ Container fake-k8s-default-kube-scheduler   Started                                                         1.6s
  ⠿ Container fake-k8s-default-kube-controller  Started                                                         1.5s
  ⠿ Container fake-k8s-default-fake-kubelet     Started                                                         1.7s
-Property "clusters.fake-k8s-default.server" set.
-Property "contexts.fake-k8s-default.cluster" set.
-Created cluster fake-k8s-default.
 
 real    0m2.587s
 user    0m0.418s
