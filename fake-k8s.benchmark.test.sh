@@ -81,7 +81,7 @@ function test_create_node() {
 
 failed=()
 
-./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull -r 1
+KUBE_VERSION="${kube_version}" ./fake-k8s create cluster --quiet-pull --generate-replicas 1
 
 echo "=== Test create pod ==="
 child_timeout 120 test_create_pod 10000 || failed+=("test_create_pod_timeout")
@@ -89,14 +89,14 @@ child_timeout 120 test_create_pod 10000 || failed+=("test_create_pod_timeout")
 echo "=== Test delete pod ==="
 child_timeout 120 test_delete_pod 0 || failed+=("test_delete_pod_timeout")
 
-./fake-k8s.sh delete
+./fake-k8s delete cluster
 
-./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull -r 10000
+KUBE_VERSION="${kube_version}" ./fake-k8s create cluster --quiet-pull --generate-replicas 10000
 
 echo "=== Test create node ==="
 child_timeout 120 test_create_node 10000 || failed+=("test_create_node_timeout")
 
-./fake-k8s.sh delete
+./fake-k8s delete cluster
 
 if [[ "${#failed[*]}" -eq 0 ]]; then
   echo "=== All tests are passed ==="

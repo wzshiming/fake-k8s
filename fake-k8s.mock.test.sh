@@ -6,7 +6,8 @@ kube_version="v1.23.5"
 kind create cluster --wait 10s --image=docker.io/kindest/node:"${kube_version}"
 sleep 30
 
-kubectl --context=kind-kind get "${resource}" -A -o json | ./fake-k8s.sh create --kube-version "${kube_version}" --quiet-pull --mock -
+KUBE_VERSION="${kube_version}" ./fake-k8s create cluster --quiet-pull --generate-replicas 0
+kubectl --context=kind-kind get "${resource}" -A -o yaml | ./fake-k8s load resource -f -
 sleep 30
 
 kind_content="$(kubectl --context=kind-kind get "${resource}" -A -o name)"
@@ -14,7 +15,7 @@ fake_k8s_content="$(kubectl --context=fake-k8s-default get "${resource}" -A -o n
 
 kind delete cluster
 
-./fake-k8s.sh delete
+./fake-k8s delete cluster
 
 echo "=== kind content ==="
 echo "${kind_content}"
