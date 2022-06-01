@@ -13,7 +13,6 @@ import (
 	"github.com/wzshiming/fake-k8s/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/scheme"
 )
@@ -135,7 +134,6 @@ func load(input []runtime.Object, apply func([]runtime.Object) ([]runtime.Object
 			if len(refs) != 0 && refs[0].Controller != nil && *refs[0].Controller {
 				otherResource = append(otherResource, obj)
 			} else {
-				oma.GetObjectMeta().SetUID("")
 				applyResource = append(applyResource, obj)
 			}
 		}
@@ -147,35 +145,24 @@ func load(input []runtime.Object, apply func([]runtime.Object) ([]runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		for _, newObj := range newResource {
+		if len(otherResource) == 0 {
+			break
+		}
+		for i, newObj := range newResource {
 			newObjMeta := newObj.(metav1.ObjectMetaAccessor).GetObjectMeta()
+			oldUid := applyResource[i].(metav1.ObjectMetaAccessor).GetObjectMeta().GetUID()
 			newUid := newObjMeta.GetUID()
-			newObjKind := newObj.GetObjectKind()
-			newGVK := newObjKind.GroupVersionKind()
-			newName := newObjMeta.GetName()
-			newNamespace := newObjMeta.GetNamespace()
 
 			remove := map[runtime.Object]struct{}{}
 			nextResource := filter(otherResource, func(otherObj runtime.Object) bool {
 				otherObjMeta := otherObj.(metav1.ObjectMetaAccessor).GetObjectMeta()
-				otherRef := otherObjMeta.GetOwnerReferences()[0]
-				otherGV, _ := schema.ParseGroupVersion(otherRef.APIVersion)
-				otherGVK := schema.GroupVersionKind{
-					Group:   otherGV.Group,
-					Version: otherGV.Version,
-					Kind:    otherRef.Kind,
-				}
-				if newGVK != otherGVK {
-					return false
-				}
-				if newNamespace != "" && newNamespace != otherObjMeta.GetNamespace() {
-					return false
-				}
-				if otherRef.Name != newName {
+				otherRefs := otherObjMeta.GetOwnerReferences()
+				otherRef := &otherRefs[0]
+				if otherRef.UID != oldUid {
 					return false
 				}
 				otherRef.UID = newUid
-				otherObjMeta.SetUID("")
+				otherObjMeta.SetOwnerReferences(otherRefs)
 				remove[otherObj] = struct{}{}
 				return true
 			})
