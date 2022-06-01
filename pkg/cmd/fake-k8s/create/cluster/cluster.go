@@ -86,5 +86,14 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 		return err
 	}
 
+	for i := 0; ; i++ {
+		ready, err := dc.Ready(ctx)
+		if ready {
+			break
+		}
+		if i > 30 {
+			return err
+		}
+	}
 	return nil
 }

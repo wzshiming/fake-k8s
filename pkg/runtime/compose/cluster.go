@@ -111,6 +111,18 @@ func (d *Cluster) Uninstall(ctx context.Context) error {
 	return nil
 }
 
+func (d *Cluster) Ready(ctx context.Context) (bool, error) {
+	kubeconfig, err := d.InHostKubeconfig()
+	if err != nil {
+		return false, err
+	}
+	err = kubectl.Run(ctx, utils.IOStreams{}, "--kubeconfig", kubeconfig, "get", "node")
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (d *Cluster) Up(ctx context.Context) error {
 	c, err := d.Config()
 	if err != nil {
