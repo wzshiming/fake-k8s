@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/wzshiming/fake-k8s/pkg/runtime/compose"
+	_ "github.com/wzshiming/fake-k8s/pkg/runtime/kind"
+
 	"github.com/go-logr/zapr"
 	fakek8s "github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s"
 	"go.uber.org/zap"

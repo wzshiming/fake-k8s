@@ -16,7 +16,7 @@ func BuildCompose(conf BuildComposeConfig) (string, error) {
 	buf := bytes.NewBuffer(nil)
 	err := composeYamlTemplate.Execute(buf, conf)
 	if err != nil {
-		return "", fmt.Errorf("build compose error: %s", err)
+		return "", fmt.Errorf("failed to execute compose yaml template: %w", err)
 	}
 	return buf.String(), nil
 }

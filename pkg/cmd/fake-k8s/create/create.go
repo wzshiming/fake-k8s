@@ -14,7 +14,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 		Args:  cobra.NoArgs,
 		Use:   "create",
 		Short: "Creates one of [cluster]",
-		Long:  "Creates one of fake Kubernetes cluster (cluster)",
+		Long:  "Creates one of [cluster]",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := cmd.Help()
 			if err != nil {

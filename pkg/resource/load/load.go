@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wzshiming/fake-k8s/pkg/k8s/kubectl"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,11 +41,11 @@ func Load(ctx context.Context, kubeconfig, src string) error {
 			}
 		}
 
-		err = kubectl.Run(ctx, utils.IOStreams{
+		err = utils.Exec(ctx, "", utils.IOStreams{
 			In:     inputRaw,
 			Out:    outputRaw,
 			ErrOut: os.Stderr,
-		}, "--kubeconfig", kubeconfig, "apply", "--force=true", "--overwrite=true", "--validate=false", "-o", "json", "-f", "-")
+		}, "kubectl", "--kubeconfig", kubeconfig, "apply", "--force=true", "--overwrite=true", "--validate=false", "-o", "json", "-f", "-")
 		if err != nil {
 			for _, obj := range objs {
 				fmt.Fprintf(os.Stderr, "%s/%s failed\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName())

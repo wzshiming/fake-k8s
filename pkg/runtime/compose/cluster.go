@@ -8,91 +8,28 @@ import (
 	"strconv"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
-	"github.com/wzshiming/fake-k8s/pkg/k8s/kubectl"
 	"github.com/wzshiming/fake-k8s/pkg/pki"
 	"github.com/wzshiming/fake-k8s/pkg/prometheus"
+	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
-	"sigs.k8s.io/yaml"
 )
 
-type ClusterConfig struct {
-	PrometheusImage            string
-	EtcdImage                  string
-	KubeApiserverImage         string
-	KubeControllerManagerImage string
-	KubeSchedulerImage         string
-	FakeKubeletImage           string
-	SecretPort                 bool
-	QuietPull                  bool
-	PrometheusPort             uint32
-	GenerateNodeName           string
-	GenerateReplicas           uint32
-	NodeName                   string
-}
-
 type Cluster struct {
-	name    string
-	workdir string
-	runtime string
+	*runtime.Cluster
 }
 
-func NewCluster(name, workdir, runtime string) *Cluster {
+func NewCluster(name, workdir string) (runtime.Runtime, error) {
 	return &Cluster{
-		name:    name,
-		workdir: workdir,
-		runtime: runtime,
-	}
+		Cluster: runtime.NewCluster(name, workdir),
+	}, nil
 }
 
-func (d *Cluster) Config() (*RawClusterConfig, error) {
-	config, err := os.ReadFile(filepath.Join(d.workdir, rawClusterConfigName))
-	if err != nil {
-		return nil, err
-	}
-	c := RawClusterConfig{}
-	err = yaml.Unmarshal(config, &c)
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
-func (d *Cluster) InHostKubeconfig() (string, error) {
-	c, err := d.Config()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(c.Workdir, InHostKubeconfigName), nil
-}
-
-func (d *Cluster) Install(ctx context.Context, conf ClusterConfig) error {
-	c := RawClusterConfig{
-		Workdir:      d.workdir,
-		Name:         d.name,
-		Runtime:      d.runtime,
-		UpCommand:    []string{"compose", "up", "-d"},
-		DownCommand:  []string{"compose", "down"},
-		StartCommand: []string{"start"},
-		StopCommand:  []string{"stop"},
-		Cluster:      conf,
-	}
-	if conf.QuietPull {
-		c.UpCommand = append(c.UpCommand, "--quiet-pull")
-	}
-	config, err := yaml.Marshal(c)
+func (d *Cluster) Install(ctx context.Context, conf runtime.Config) error {
+	err := d.Cluster.Install(ctx, conf)
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(d.workdir, 0755)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(filepath.Join(d.workdir, rawClusterConfigName), config, 0644)
-	if err != nil {
-		return err
-	}
-	err = installCluster(ctx, d.name, d.workdir, conf)
+	err = installCluster(ctx, conf.Name, conf.Workdir, conf)
 	if err != nil {
 		return err
 	}
@@ -100,106 +37,86 @@ func (d *Cluster) Install(ctx context.Context, conf ClusterConfig) error {
 }
 
 func (d *Cluster) Uninstall(ctx context.Context) error {
-	c, err := d.Config()
+	conf, err := d.Config()
 	if err != nil {
 		return err
 	}
-	err = uninstallCluster(ctx, c.Name, d.workdir)
+	err = uninstallCluster(ctx, conf.Name, conf.Workdir)
+	if err != nil {
+		return err
+	}
+	err = d.Cluster.Uninstall(ctx)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d *Cluster) Ready(ctx context.Context) (bool, error) {
-	kubeconfig, err := d.InHostKubeconfig()
-	if err != nil {
-		return false, err
-	}
-	err = kubectl.Run(ctx, utils.IOStreams{}, "--kubeconfig", kubeconfig, "get", "node")
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
 func (d *Cluster) Up(ctx context.Context) error {
-	c, err := d.Config()
+	conf, err := d.Config()
 	if err != nil {
 		return err
 	}
-	output, err := utils.Exec(ctx, d.workdir, c.Runtime, c.UpCommand...)
+	args := []string{"compose", "up", "-d"}
+	if conf.QuietPull {
+		args = append(args, "--quiet-pull")
+	}
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{
+		ErrOut: os.Stderr,
+	}, conf.Runtime, args...)
 	if err != nil {
-		return fmt.Errorf("%s\n%s", err, output)
+		return err
 	}
 	return nil
 }
 
 func (d *Cluster) Down(ctx context.Context) error {
-	c, err := d.Config()
+	conf, err := d.Config()
 	if err != nil {
 		return err
 	}
-	output, err := utils.Exec(ctx, d.workdir, c.Runtime, c.DownCommand...)
+	args := []string{"compose", "down"}
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{
+		ErrOut: os.Stderr,
+	}, conf.Runtime, args...)
 	if err != nil {
-		return fmt.Errorf("%s\n%s", err, output)
+		return err
 	}
 	return nil
 }
 
 func (d *Cluster) Start(ctx context.Context, name string) error {
-	c, err := d.Config()
+	conf, err := d.Config()
 	if err != nil {
 		return err
 	}
-	output, err := utils.Exec(ctx, d.workdir, c.Runtime, append(c.StartCommand, name)...)
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{}, conf.Runtime, "start", name)
 	if err != nil {
-		return fmt.Errorf("%s\n%s", err, output)
+		return err
 	}
 	return nil
 }
 
 func (d *Cluster) Stop(ctx context.Context, name string) error {
-	c, err := d.Config()
+	conf, err := d.Config()
 	if err != nil {
 		return err
 	}
-	output, err := utils.Exec(ctx, d.workdir, c.Runtime, append(c.StopCommand, name)...)
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{}, conf.Runtime, "stop", name)
 	if err != nil {
-		return fmt.Errorf("%s\n%s", err, output)
+		return err
 	}
 	return nil
 }
 
-type RawClusterConfig struct {
-	Name         string
-	Workdir      string
-	Runtime      string
-	UpCommand    []string
-	DownCommand  []string
-	StartCommand []string
-	StopCommand  []string
-	Cluster      ClusterConfig
-}
-
-var (
-	rawClusterConfigName    = "fake-k8s.yaml"
-	InHostKubeconfigName    = "kubeconfig.yaml"
-	InClusterKubeconfigName = "kubeconfig"
-	EtcdDataDirName         = "etcd"
-	PkiName                 = "pki"
-	ComposeName             = "docker-compose.yaml"
-	Prometheus              = "prometheus.yaml"
-)
-
 // installCluster installs a fake cluster.
-func installCluster(ctx context.Context, name, workdir string, conf ClusterConfig) error {
-	kubeconfigPath := filepath.Join(workdir, InHostKubeconfigName)
+func installCluster(ctx context.Context, name, workdir string, conf runtime.Config) error {
+	kubeconfigPath := filepath.Join(workdir, runtime.InHostKubeconfigName)
 	prometheusPath := ""
-	inClusterOnHostKubeconfigPath := filepath.Join(workdir, InClusterKubeconfigName)
-	etcdPath := filepath.Join(workdir, EtcdDataDirName)
-	pkiPath := filepath.Join(workdir, PkiName)
-	composePath := filepath.Join(workdir, ComposeName)
+	inClusterOnHostKubeconfigPath := filepath.Join(workdir, runtime.InClusterKubeconfigName)
+	etcdPath := filepath.Join(workdir, runtime.EtcdDataDirName)
+	pkiPath := filepath.Join(workdir, runtime.PkiName)
+	composePath := filepath.Join(workdir, runtime.ComposeName)
 	err := os.MkdirAll(etcdPath, 0755)
 	if err != nil {
 		return err
@@ -240,7 +157,7 @@ func installCluster(ctx context.Context, name, workdir string, conf ClusterConfi
 
 	// Setup prometheus
 	if conf.PrometheusPort != 0 {
-		prometheusPath = filepath.Join(workdir, Prometheus)
+		prometheusPath = filepath.Join(workdir, runtime.Prometheus)
 		prometheusData, err := prometheus.BuildPrometheus(prometheus.BuildPrometheusConfig{
 			ProjectName:  name,
 			AdminCrtPath: inClusterAdminCertPath,
@@ -330,13 +247,13 @@ func installCluster(ctx context.Context, name, workdir string, conf ClusterConfi
 	}
 
 	// set the context in default kubeconfig
-	kubectl.Run(ctx, utils.IOStreams{}, "config", "set", "clusters."+name+".server", scheme+"://127.0.0.1:"+strconv.Itoa(port))
-	kubectl.Run(ctx, utils.IOStreams{}, "config", "set", "contexts."+name+".cluster", name)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+name+".server", scheme+"://127.0.0.1:"+strconv.Itoa(port))
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+name+".cluster", name)
 	if adminKeyPath != "" {
-		kubectl.Run(ctx, utils.IOStreams{}, "config", "set", "clusters."+name+".insecure-skip-tls-verify", "true")
-		kubectl.Run(ctx, utils.IOStreams{}, "config", "set", "contexts."+name+".user", name)
-		kubectl.Run(ctx, utils.IOStreams{}, "config", "set", "users."+name+".client-certificate", adminCertPath)
-		kubectl.Run(ctx, utils.IOStreams{}, "config", "set", "users."+name+".client-key", adminKeyPath)
+		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+name+".insecure-skip-tls-verify", "true")
+		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+name+".user", name)
+		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "users."+name+".client-certificate", adminCertPath)
+		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "users."+name+".client-key", adminKeyPath)
 	}
 	return nil
 }
@@ -344,11 +261,9 @@ func installCluster(ctx context.Context, name, workdir string, conf ClusterConfi
 // uninstallCluster uninstall a fake cluster.
 func uninstallCluster(ctx context.Context, name, workdir string) error {
 	// unset the context in default kubeconfig
-	kubectl.Run(ctx, utils.IOStreams{}, "config", "unset", "clusters."+name)
-	kubectl.Run(ctx, utils.IOStreams{}, "config", "unset", "users."+name)
-	kubectl.Run(ctx, utils.IOStreams{}, "config", "unset", "contexts."+name)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "clusters."+name)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "users."+name)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+name)
 
-	// cleanup workdir
-	os.RemoveAll(workdir)
 	return nil
 }

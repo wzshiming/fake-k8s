@@ -7,7 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/wzshiming/fake-k8s/pkg/resource/load"
-	"github.com/wzshiming/fake-k8s/pkg/runtime/compose"
+	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
@@ -34,9 +34,16 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 }
 
 func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
-	dc := compose.NewCluster(vars.ProjectName+"-"+flags.Name, filepath.Join(vars.TempDir, flags.Name), vars.Runtime)
 	controllerName := vars.ProjectName + "-" + flags.Name + "-kube-controller-manager"
-	err := dc.Stop(ctx, controllerName)
+	name := vars.ProjectName + "-" + flags.Name
+	workdir := filepath.Join(vars.TempDir, flags.Name)
+
+	dc, err := runtime.Load(name, workdir)
+	if err != nil {
+		return err
+	}
+
+	err = dc.Stop(ctx, controllerName)
 	if err != nil {
 		return err
 	}

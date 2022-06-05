@@ -1,22 +1,11 @@
 #!/usr/bin/env bash
 
-releases=(
-  v1.24.0
-  v1.23.6
-  v1.22.9
-  v1.21.12
-  v1.20.15
-  v1.19.16
-  v1.18.20
-  v1.17.17
-  v1.16.15
-  v1.15.12
-  v1.14.10
-  v1.13.12
-  v1.12.10
-  v1.11.10
-  v1.10.13
-)
+# Gets the release from the argument
+releases=()
+while [[ $# -gt 0 ]]; do
+  releases+=("${1}")
+  shift
+done
 
 function test_release() {
   local release="${1}"

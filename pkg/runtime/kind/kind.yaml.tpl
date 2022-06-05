@@ -1,0 +1,16 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+networking:
+  apiServerAddress: "0.0.0.0"
+  # apiServerPort: 6443
+nodes:
+  - role: control-plane
+
+${{ if .PrometheusPort }}
+    extraPortMappings:
+      - containerPort: 9090
+        hostPort: ${{ .PrometheusPort }}
+        listenAddress: "0.0.0.0"
+        protocol: TCP
+${{ end }}
