@@ -1,5 +1,6 @@
 package k8s
 
+// lists from https://github.com/kubernetes/kubernetes/blob/2d7dcf928c3e0e8dd4c29c421893a299e1a1b857/cmd/kubeadm/app/constants/constants.go#L491
 var etcdVersions = map[int]string{
 	8:  "3.0.17",
 	9:  "3.1.12",
@@ -15,17 +16,18 @@ var etcdVersions = map[int]string{
 	19: "3.4.13-0",
 	20: "3.4.13-0",
 	21: "3.4.13-0",
-	22: "3.5.1-0",
-	23: "3.5.1-0",
-	24: "3.5.1-0",
+	22: "3.5.4-0",
+	23: "3.5.4-0",
+	24: "3.5.4-0",
+	25: "3.5.4-0",
 }
 
 func GetEtcdVersion(version int) string {
 	if version < 8 {
 		version = 8
 	}
-	if version > 24 {
-		version = 24
+	if version > 25 {
+		version = 25
 	}
 	return etcdVersions[version]
 }
