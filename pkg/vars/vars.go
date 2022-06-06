@@ -51,7 +51,7 @@ var (
 	FakeVersion = getEnv("FAKE_VERSION", "v0.7.0")
 
 	// KubeVersion is the version of Kubernetes to use.
-	KubeVersion = getEnv("KUBE_VERSION", "v1.19.16")
+	KubeVersion = getEnv("KUBE_VERSION", "v1.24.1")
 
 	// EtcdVersion is the version of etcd to use.
 	EtcdVersion = getEnv("ETCD_VERSION", k8s.GetEtcdVersion(parseRelease(KubeVersion)))
