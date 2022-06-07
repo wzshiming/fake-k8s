@@ -9,7 +9,6 @@ import (
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
 	"github.com/wzshiming/fake-k8s/pkg/pki"
-	"github.com/wzshiming/fake-k8s/pkg/prometheus"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
@@ -24,8 +23,8 @@ func NewCluster(name, workdir string) (runtime.Runtime, error) {
 	}, nil
 }
 
-func (d *Cluster) Install(ctx context.Context, conf runtime.Config) error {
-	err := d.Cluster.Install(ctx, conf)
+func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
+	err := c.Cluster.Install(ctx, conf)
 	if err != nil {
 		return err
 	}
@@ -36,8 +35,8 @@ func (d *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 	return nil
 }
 
-func (d *Cluster) Uninstall(ctx context.Context) error {
-	conf, err := d.Config()
+func (c *Cluster) Uninstall(ctx context.Context) error {
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
@@ -45,19 +44,19 @@ func (d *Cluster) Uninstall(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = d.Cluster.Uninstall(ctx)
+	err = c.Cluster.Uninstall(ctx)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d *Cluster) Up(ctx context.Context) error {
-	conf, err := d.Config()
+func (c *Cluster) Up(ctx context.Context) error {
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
-	args := []string{"compose", "up", "-d"}
+	args := []string{"compose", "up", "-c"}
 	if conf.QuietPull {
 		args = append(args, "--quiet-pull")
 	}
@@ -70,8 +69,8 @@ func (d *Cluster) Up(ctx context.Context) error {
 	return nil
 }
 
-func (d *Cluster) Down(ctx context.Context) error {
-	conf, err := d.Config()
+func (c *Cluster) Down(ctx context.Context) error {
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
@@ -85,8 +84,8 @@ func (d *Cluster) Down(ctx context.Context) error {
 	return nil
 }
 
-func (d *Cluster) Start(ctx context.Context, name string) error {
-	conf, err := d.Config()
+func (c *Cluster) Start(ctx context.Context, name string) error {
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
@@ -97,8 +96,8 @@ func (d *Cluster) Start(ctx context.Context, name string) error {
 	return nil
 }
 
-func (d *Cluster) Stop(ctx context.Context, name string) error {
-	conf, err := d.Config()
+func (c *Cluster) Stop(ctx context.Context, name string) error {
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
@@ -158,7 +157,7 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 	// Setup prometheus
 	if conf.PrometheusPort != 0 {
 		prometheusPath = filepath.Join(workdir, runtime.Prometheus)
-		prometheusData, err := prometheus.BuildPrometheus(prometheus.BuildPrometheusConfig{
+		prometheusData, err := BuildPrometheus(BuildPrometheusConfig{
 			ProjectName:  name,
 			AdminCrtPath: inClusterAdminCertPath,
 			AdminKeyPath: inClusterAdminKeyPath,
