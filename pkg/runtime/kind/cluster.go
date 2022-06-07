@@ -88,32 +88,32 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 }
 
 func (c *Cluster) Up(ctx context.Context) error {
-	r, err := c.Config()
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
 
 	err = utils.Exec(ctx, "", utils.IOStreams{
 		ErrOut: os.Stderr,
-	}, r.Runtime, "create", "cluster",
-		"--config", filepath.Join(r.Workdir, runtime.KindName),
-		"--name", r.Name,
-		"--image", r.KindNodeImage,
+	}, conf.Runtime, "create", "cluster",
+		"--config", filepath.Join(conf.Workdir, runtime.KindName),
+		"--name", conf.Name,
+		"--image", conf.KindNodeImage,
 	)
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "cordon", r.Name+"-control-plane")
+	err = utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "cordon", conf.Name+"-control-plane")
 	if err != nil {
 		return err
 	}
 
 	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "inspect",
-		r.FakeKubeletImage,
+		conf.FakeKubeletImage,
 	)
 	if err != nil {
 		err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "pull",
-			r.FakeKubeletImage,
+			conf.FakeKubeletImage,
 		)
 		if err != nil {
 			return err
@@ -121,26 +121,26 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	err = utils.Exec(ctx, "", utils.IOStreams{}, "kind", "load", "docker-image",
-		r.FakeKubeletImage,
-		"--name", r.Name,
+		conf.FakeKubeletImage,
+		"--name", conf.Name,
 	)
 	if err != nil {
 		return err
 	}
 	err = utils.Exec(ctx, "", utils.IOStreams{
 		ErrOut: os.Stderr,
-	}, "kubectl", "apply", "-f", filepath.Join(r.Workdir, runtime.FakeKubeletDeploy))
+	}, "kubectl", "apply", "-f", filepath.Join(conf.Workdir, runtime.FakeKubeletDeploy))
 	if err != nil {
 		return err
 	}
 
-	if r.PrometheusPort != 0 {
+	if conf.PrometheusPort != 0 {
 		err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "inspect",
-			r.PrometheusImage,
+			conf.PrometheusImage,
 		)
 		if err != nil {
 			err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "pull",
-				r.PrometheusImage,
+				conf.PrometheusImage,
 			)
 			if err != nil {
 				return err
@@ -148,15 +148,15 @@ func (c *Cluster) Up(ctx context.Context) error {
 		}
 
 		err = utils.Exec(ctx, "", utils.IOStreams{}, "kind", "load", "docker-image",
-			r.PrometheusImage,
-			"--name", r.Name,
+			conf.PrometheusImage,
+			"--name", conf.Name,
 		)
 		if err != nil {
 			return err
 		}
 		err = utils.Exec(ctx, "", utils.IOStreams{
 			ErrOut: os.Stderr,
-		}, "kubectl", "apply", "-f", filepath.Join(r.Workdir, runtime.PrometheusDeploy))
+		}, "kubectl", "apply", "-f", filepath.Join(conf.Workdir, runtime.PrometheusDeploy))
 		if err != nil {
 			return err
 		}
@@ -181,35 +181,35 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	// set the context in default kubeconfig
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+r.Name+".cluster", "kind-"+r.Name)
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+r.Name+".user", "kind-"+r.Name)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".cluster", "kind-"+conf.Name)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".user", "kind-"+conf.Name)
 	return nil
 }
 
 func (c *Cluster) Down(ctx context.Context) error {
-	r, err := c.Config()
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
 	err = utils.Exec(ctx, "", utils.IOStreams{
 		ErrOut: os.Stderr,
-	}, r.Runtime, "delete", "cluster", "--name", r.Name)
+	}, conf.Runtime, "delete", "cluster", "--name", conf.Name)
 	if err != nil {
 		return err
 	}
 
 	// unset the context in default kubeconfig
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+r.Name+".cluster")
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+r.Name+".user")
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+conf.Name+".cluster")
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+conf.Name+".user")
 	return nil
 }
 
 func (c *Cluster) Start(ctx context.Context, name string) error {
-	r, err := c.Config()
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", "-it", r.Name+"-control-plane", "mv", "/etc/kubernetes/"+name+".yaml.bak", "/etc/kubernetes/manifests/"+name+".yaml")
+	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", "-it", conf.Name+"-control-plane", "mv", "/etc/kubernetes/"+name+".yaml.bak", "/etc/kubernetes/manifests/"+name+".yaml")
 	if err != nil {
 		return err
 	}
@@ -217,11 +217,11 @@ func (c *Cluster) Start(ctx context.Context, name string) error {
 }
 
 func (c *Cluster) Stop(ctx context.Context, name string) error {
-	r, err := c.Config()
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", "-it", r.Name+"-control-plane", "mv", "/etc/kubernetes/manifests/"+name+".yaml", "/etc/kubernetes/"+name+".yaml.bak")
+	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", "-it", conf.Name+"-control-plane", "mv", "/etc/kubernetes/manifests/"+name+".yaml", "/etc/kubernetes/"+name+".yaml.bak")
 	if err != nil {
 		return err
 	}
