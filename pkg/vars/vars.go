@@ -94,6 +94,9 @@ var (
 
 	// PrometheusImage is the image of Prometheus.
 	PrometheusImage = getEnv("PROMETHEUS_IMAGE", joinImageURI(PrometheusImagePrefix, "prometheus", PrometheusVersion))
+
+	// KindNodeImage is the image of kind node.
+	KindNodeImage = getEnv("KIND_NODE_IMAGE", "docker.io/kindest/node:"+KubeVersion)
 )
 
 // getEnv returns the value of the environment variable named by the key.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-kube_version="v1.23.5"
+kube_version="$1"
 
 function child_timeout() {
   local to="${1}"

@@ -47,7 +47,7 @@ jobs:
           name: image
           path: image.tar
 
-  test:
+  e2e-test-kind:
     runs-on: ubuntu-latest
     needs:
       - build-fake-k8s
@@ -68,9 +68,9 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          ./fake-k8s.test.sh
+          RUNTIME=kind ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 9)
 
-  mock-test:
+  e2e-test:
     runs-on: ubuntu-latest
     needs:
       - build-fake-k8s
@@ -91,9 +91,32 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          ./fake-k8s.mock.test.sh
+          ./fake-k8s.test.sh $(cat supported_releases.txt)
 
-  benchmark-test:
+  e2e-mock-test:
+    runs-on: ubuntu-latest
+    needs:
+      - build-fake-k8s
+      - build-fake-kubelet
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for image tar
+        uses: actions/download-artifact@v2
+        with:
+          name: image
+      - name: Load image tar
+        run: |
+          docker load -i image.tar
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run test
+        run: |
+          chmod +x fake-k8s
+          ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
+
+  e2e-benchmark-test:
     runs-on: ubuntu-latest
     needs:
       - build-fake-k8s
@@ -114,4 +137,4 @@ jobs:
       - name: Run benchmark test
         run: |
           chmod +x fake-k8s
-          ./fake-k8s.benchmark.test.sh
+          ./fake-k8s.benchmark.test.sh $(cat supported_releases.txt | head -n 1)

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/runtime/compose"
+	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
@@ -23,9 +24,11 @@ type flagpole struct {
 	KubeSchedulerImage         string
 	FakeKubeletImage           string
 	PrometheusImage            string
+	KindNodeImage              string
 	GenerateReplicas           uint32
 	GenerateNodeName           string
 	NodeName                   []string
+	Runtime                    string
 }
 
 // NewCommand returns a new cobra.Command for cluster creation
@@ -40,7 +43,6 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 			return runE(cmd.Context(), logger, flags)
 		},
 	}
-	cmd.HasFlags()
 	cmd.Flags().StringVar(&flags.Name, "name", "default", "cluster name, config")
 	cmd.Flags().Uint32Var(&flags.PrometheusPort, "prometheus-port", uint32(vars.PrometheusPort), "port to expose Prometheus metrics")
 	cmd.Flags().BoolVar(&flags.SecurePort, "secure-port", vars.SecurePort, "apiserver use TLS")
@@ -51,39 +53,61 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	cmd.Flags().StringVar(&flags.KubeSchedulerImage, "kube-scheduler-image", vars.KubeSchedulerImage, "image of kube-scheduler \n'${KUBE_IMAGE_PREFIX}/kube-scheduler:${KUBE_VERSION}'\n")
 	cmd.Flags().StringVar(&flags.FakeKubeletImage, "fake-kubelet-image", vars.FakeKubeletImage, "image of fake-kubelet \n'${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}'\n")
 	cmd.Flags().StringVar(&flags.PrometheusImage, "prometheus-image", vars.PrometheusImage, "image of Prometheus \n'${PROMETHEUS_IMAGE_PREFIX}/prometheus:${PROMETHEUS_VERSION}'\n")
+	cmd.Flags().StringVar(&flags.KindNodeImage, "kind-node-image", vars.KindNodeImage, "image of kind node")
 	cmd.Flags().Uint32Var(&flags.GenerateReplicas, "generate-replicas", uint32(vars.GenerateReplicas), "replicas of the fake node")
 	cmd.Flags().StringVar(&flags.GenerateNodeName, "generate-node-name", vars.GenerateNodeName, "node name of the fake node")
 	cmd.Flags().StringArrayVar(&flags.NodeName, "node-name", vars.NodeName, "node name of the fake node")
+	cmd.Flags().StringVar(&flags.Runtime, "runtime", vars.Runtime, "runtime of the fake cluster ("+strings.Join(runtime.List(), " or ")+")")
 	return cmd
 }
 
 func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
-	dc := compose.NewCluster(vars.ProjectName+"-"+flags.Name, filepath.Join(vars.TempDir, flags.Name), vars.Runtime)
-	_, err := dc.Config()
-	if err == nil {
-		return fmt.Errorf("cluster %q is existing", flags.Name)
+	name := vars.ProjectName + "-" + flags.Name
+	workdir := filepath.Join(vars.TempDir, flags.Name)
+
+	newRuntime, ok := runtime.Get(flags.Runtime)
+	if !ok {
+		return fmt.Errorf("runtime %q not found", flags.Runtime)
 	}
-	err = dc.Install(ctx, compose.ClusterConfig{
-		PrometheusImage:            flags.PrometheusImage,
-		EtcdImage:                  flags.EtcdImage,
-		KubeApiserverImage:         flags.KubeApiserverImage,
-		KubeControllerManagerImage: flags.KubeControllerManagerImage,
-		KubeSchedulerImage:         flags.KubeSchedulerImage,
-		FakeKubeletImage:           flags.FakeKubeletImage,
-		SecretPort:                 flags.SecurePort,
-		QuietPull:                  flags.QuietPull,
-		PrometheusPort:             flags.PrometheusPort,
-		GenerateNodeName:           flags.GenerateNodeName,
-		GenerateReplicas:           flags.GenerateReplicas,
-		NodeName:                   strings.Join(flags.NodeName, ","),
-	})
+
+	dc, err := newRuntime(name, workdir)
 	if err != nil {
 		return err
+	}
+	_, err = dc.Config()
+	if err == nil {
+		logger.Info("cluster is existing", "cluster", flags.Name)
+		dc, err = runtime.Load(name, workdir)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = dc.Install(ctx, runtime.Config{
+			Name:                       name,
+			Workdir:                    workdir,
+			Runtime:                    flags.Runtime,
+			PrometheusImage:            flags.PrometheusImage,
+			EtcdImage:                  flags.EtcdImage,
+			KubeApiserverImage:         flags.KubeApiserverImage,
+			KubeControllerManagerImage: flags.KubeControllerManagerImage,
+			KubeSchedulerImage:         flags.KubeSchedulerImage,
+			FakeKubeletImage:           flags.FakeKubeletImage,
+			KindNodeImage:              flags.KindNodeImage,
+			SecretPort:                 flags.SecurePort,
+			QuietPull:                  flags.QuietPull,
+			PrometheusPort:             flags.PrometheusPort,
+			GenerateNodeName:           flags.GenerateNodeName,
+			GenerateReplicas:           flags.GenerateReplicas,
+			NodeName:                   strings.Join(flags.NodeName, ","),
+		})
+		if err != nil {
+			return fmt.Errorf("failed install %q cluster: %w", name, err)
+		}
 	}
 
 	err = dc.Up(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed start %q cluster: %w", name, err)
 	}
 
 	for i := 0; ; i++ {
@@ -91,9 +115,11 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 		if ready {
 			break
 		}
+		time.Sleep(time.Second)
 		if i > 30 {
 			return err
 		}
 	}
+
 	return nil
 }

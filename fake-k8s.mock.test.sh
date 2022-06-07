@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 resource="ns,node,statefulset,daemonset,deployment,replicaset,pod"
-kube_version="v1.23.5"
+kube_version="$1"
 
 kind create cluster --wait 10s --image=docker.io/kindest/node:"${kube_version}"
 sleep 30
