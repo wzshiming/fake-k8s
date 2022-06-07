@@ -1,4 +1,4 @@
-package compose
+package binary
 
 import (
 	"bytes"
@@ -22,8 +22,14 @@ func BuildPrometheus(conf BuildPrometheusConfig) (string, error) {
 }
 
 type BuildPrometheusConfig struct {
-	ProjectName  string
-	SecretPort   bool
-	AdminCrtPath string
-	AdminKeyPath string
+	ProjectName               string
+	SecretPort                bool
+	AdminCrtPath              string
+	AdminKeyPath              string
+	PrometheusPort            int
+	EtcdPort                  int
+	KubeApiserverPort         int
+	KubeControllerManagerPort int
+	KubeSchedulerPort         int
+	FakeKubeletPort           int
 }

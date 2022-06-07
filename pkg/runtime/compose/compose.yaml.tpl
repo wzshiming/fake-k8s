@@ -20,7 +20,7 @@ ${{ if .PrometheusPath }}
       - ${{ .PrometheusPort }}:9090
     volumes:
       - ${{ .PrometheusPath }}:${{ .InClusterPrometheusPath }}:ro
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
@@ -62,7 +62,7 @@ ${{ end }}
     links:
       - etcd
     ports:
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - ${{ .ApiserverPort }}:6443
 ${{ else }}
       - ${{ .ApiserverPort }}:8080
@@ -79,7 +79,7 @@ ${{ end }}
       - "10000"
       - --allow-privileged
 
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - --bind-address
       - 0.0.0.0
       - --secure-port
@@ -103,7 +103,7 @@ ${{ else }}
       - "8080"
 ${{ end }}
 
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
     volumes:
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
@@ -124,7 +124,7 @@ ${{ end }}
       - ${{ .InClusterKubeconfigPath }}
 
 ${{ if .PrometheusPath }}
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - --bind-address
       - 0.0.0.0
       - --secure-port
@@ -140,7 +140,7 @@ ${{ end }}
 ${{ end }}
     volumes:
       - ${{ .KubeconfigPath }}:${{ .InClusterKubeconfigPath }}:ro
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
@@ -159,7 +159,7 @@ ${{ end }}
       - ${{ .InClusterKubeconfigPath }}
 
 ${{ if .PrometheusPath }}
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - --bind-address
       - 0.0.0.0
       - --secure-port
@@ -175,7 +175,7 @@ ${{ end }}
 ${{ end }}
     volumes:
       - ${{ .KubeconfigPath }}:${{ .InClusterKubeconfigPath }}:ro
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
@@ -265,7 +265,7 @@ ${{ if .PrometheusPath }}
 ${{ end }}
     volumes:
       - ${{ .KubeconfigPath }}:${{ .InClusterKubeconfigPath }}:ro
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro

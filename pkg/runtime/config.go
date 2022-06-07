@@ -25,6 +25,17 @@ type Config struct {
 	// For kind
 	KindNodeImage string
 
+	// For binary
+	KubeApiserverBinary         string
+	KubeControllerManagerBinary string
+	KubeSchedulerBinary         string
+	FakeKubeletBinary           string
+	EtcdBinaryTar               string
+	PrometheusBinaryTar         string
+
+	// Cache directory
+	CacheDir string
+
 	// For docker-compose and binary
 	SecretPort bool
 

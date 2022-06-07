@@ -20,7 +20,7 @@ scrape_configs:
   enable_http2: true
   static_configs:
   - targets:
-    - localhost:9090
+    - localhost:${{ .PrometheusPort }}
 - job_name: "etcd"
   scheme: http
   honor_timestamps: true
@@ -29,7 +29,7 @@ scrape_configs:
   enable_http2: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-etcd:2379"
+    - localhost:${{ .EtcdPort }}
 - job_name: "fake-kubelet"
   scheme: http
   honor_timestamps: true
@@ -38,7 +38,7 @@ scrape_configs:
   enable_http2: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-fake-kubelet:8080"
+    - localhost:${{ .FakeKubeletPort }}
 
 ${{ if .SecretPort }}
 - job_name: "kube-apiserver"
@@ -53,7 +53,7 @@ ${{ if .SecretPort }}
     insecure_skip_verify: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-kube-apiserver:6443"
+    - localhost:${{ .KubeApiserverPort }}
 - job_name: "kube-controller-manager"
   scheme: https
   honor_timestamps: true
@@ -66,7 +66,7 @@ ${{ if .SecretPort }}
     insecure_skip_verify: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-kube-controller-manager:10257"
+    - localhost:${{ .KubeControllerManagerPort }}
 - job_name: "kube-scheduler"
   scheme: https
   honor_timestamps: true
@@ -79,7 +79,7 @@ ${{ if .SecretPort }}
     insecure_skip_verify: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-kube-scheduler:10259"
+    - localhost:${{ .KubeSchedulerPort }}
 ${{ else }}
 - job_name: "kube-apiserver"
   scheme: http
@@ -89,7 +89,7 @@ ${{ else }}
   enable_http2: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-kube-apiserver:8080"
+    - localhost:${{ .KubeApiserverPort }}
 - job_name: "kube-controller-manager"
   scheme: http
   honor_timestamps: true
@@ -98,7 +98,7 @@ ${{ else }}
   enable_http2: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-kube-controller-manager:10252"
+    - localhost:${{ .KubeControllerManagerPort }}
 - job_name: "kube-scheduler"
   scheme: http
   honor_timestamps: true
@@ -107,5 +107,5 @@ ${{ else }}
   enable_http2: true
   static_configs:
   - targets:
-    - "${{ .ProjectName }}-kube-scheduler:10251"
+    - localhost:${{ .KubeSchedulerPort }}
 ${{ end }}

@@ -34,7 +34,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 }
 
 func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
-	controllerName := vars.ProjectName + "-" + flags.Name + "-kube-controller-manager"
+	controllerName := "kube-controller-manager"
 	name := vars.ProjectName + "-" + flags.Name
 	workdir := filepath.Join(vars.TempDir, flags.Name)
 

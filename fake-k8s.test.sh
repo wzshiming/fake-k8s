@@ -60,8 +60,8 @@ EOF
     fi
     sleep 1
   done
-
   echo "${targets}"
+
   if ! [[ "$(echo "${targets}" | grep "^up " | wc -l)" -eq "6" ]]; then
     echo "=== prometheus of release ${release} is not works ==="
     failed+=("${release}_prometheus_not_works")

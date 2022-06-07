@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"sort"
 )
 
 type NewRuntime func(name, workdir string) (Runtime, error)
@@ -43,5 +44,6 @@ func List() []string {
 	for name := range registry {
 		rts = append(rts, name)
 	}
+	sort.Strings(rts)
 	return rts
 }
