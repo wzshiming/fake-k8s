@@ -25,9 +25,6 @@ type Config struct {
 	// For kind
 	KindNodeImage string
 
-	// For docker-compose and binary
-	SecretPort bool
-
 	// Pull image
 	QuietPull bool
 }

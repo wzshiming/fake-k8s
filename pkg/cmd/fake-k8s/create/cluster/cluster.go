@@ -16,7 +16,6 @@ import (
 type flagpole struct {
 	Name                       string
 	PrometheusPort             uint32
-	SecurePort                 bool
 	QuietPull                  bool
 	EtcdImage                  string
 	KubeApiserverImage         string
@@ -45,7 +44,6 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&flags.Name, "name", "default", "cluster name, config")
 	cmd.Flags().Uint32Var(&flags.PrometheusPort, "prometheus-port", uint32(vars.PrometheusPort), "port to expose Prometheus metrics")
-	cmd.Flags().BoolVar(&flags.SecurePort, "secure-port", vars.SecurePort, "apiserver use TLS")
 	cmd.Flags().BoolVar(&flags.QuietPull, "quiet-pull", vars.QuietPull, "pull without printing progress information")
 	cmd.Flags().StringVar(&flags.EtcdImage, "etcd-image", vars.EtcdImage, "image of etcd \n'${KUBE_IMAGE_PREFIX}/etcd:${ETCD_VERSION}'")
 	cmd.Flags().StringVar(&flags.KubeApiserverImage, "kube-apiserver-image", vars.KubeApiserverImage, "image of kube-apiserver \n'${KUBE_IMAGE_PREFIX}/kube-apiserver:${KUBE_VERSION}'\n")
@@ -93,7 +91,6 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 			KubeSchedulerImage:         flags.KubeSchedulerImage,
 			FakeKubeletImage:           flags.FakeKubeletImage,
 			KindNodeImage:              flags.KindNodeImage,
-			SecretPort:                 flags.SecurePort,
 			QuietPull:                  flags.QuietPull,
 			PrometheusPort:             flags.PrometheusPort,
 			GenerateNodeName:           flags.GenerateNodeName,

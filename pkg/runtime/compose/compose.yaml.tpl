@@ -20,13 +20,10 @@ ${{ if .PrometheusPath }}
       - ${{ .PrometheusPort }}:9090
     volumes:
       - ${{ .PrometheusPath }}:${{ .InClusterPrometheusPath }}:ro
-${{ if .AdminKeyPath }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
 ${{ end }}
-${{ end }}
-
 
   # Etcd
   etcd:
@@ -62,11 +59,7 @@ ${{ end }}
     links:
       - etcd
     ports:
-${{ if .AdminKeyPath }}
       - ${{ .ApiserverPort }}:6443
-${{ else }}
-      - ${{ .ApiserverPort }}:8080
-${{ end }}
     command:
       - kube-apiserver
       - --admission-control
@@ -78,8 +71,6 @@ ${{ end }}
       - --default-watch-cache-size
       - "10000"
       - --allow-privileged
-
-${{ if .AdminKeyPath }}
       - --bind-address
       - 0.0.0.0
       - --secure-port
@@ -96,19 +87,10 @@ ${{ if .AdminKeyPath }}
       - ${{ .InClusterAdminKeyPath }}
       - --service-account-issuer
       - https://kubernetes.default.svc.cluster.local
-${{ else }}
-      - --insecure-bind-address
-      - 0.0.0.0
-      - --insecure-port
-      - "8080"
-${{ end }}
-
-${{ if .AdminKeyPath }}
     volumes:
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
-${{ end }}
 
 
   # Kube-controller-manager
@@ -124,27 +106,18 @@ ${{ end }}
       - ${{ .InClusterKubeconfigPath }}
 
 ${{ if .PrometheusPath }}
-${{ if .AdminKeyPath }}
       - --bind-address
       - 0.0.0.0
       - --secure-port
       - "10257"
       - --authorization-always-allow-paths
       - /healthz,/metrics
-${{ else }}
-      - --address
-      - 0.0.0.0
-      - --port
-      - "10252"
-${{ end }}
 ${{ end }}
     volumes:
       - ${{ .KubeconfigPath }}:${{ .InClusterKubeconfigPath }}:ro
-${{ if .AdminKeyPath }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
-${{ end }}
 
   # Kube-scheduler
   kube_scheduler:
@@ -159,27 +132,18 @@ ${{ end }}
       - ${{ .InClusterKubeconfigPath }}
 
 ${{ if .PrometheusPath }}
-${{ if .AdminKeyPath }}
       - --bind-address
       - 0.0.0.0
       - --secure-port
       - "10259"
       - --authorization-always-allow-paths
       - /healthz,/metrics
-${{ else }}
-      - --address
-      - 0.0.0.0
-      - --port
-      - "10251"
-${{ end }}
 ${{ end }}
     volumes:
       - ${{ .KubeconfigPath }}:${{ .InClusterKubeconfigPath }}:ro
-${{ if .AdminKeyPath }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
-${{ end }}
 
   # Fake-kubelet
   fake_kubelet:
@@ -265,11 +229,9 @@ ${{ if .PrometheusPath }}
 ${{ end }}
     volumes:
       - ${{ .KubeconfigPath }}:${{ .InClusterKubeconfigPath }}:ro
-${{ if .AdminKeyPath }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
-${{ end }}
 
 # Network
 networks:

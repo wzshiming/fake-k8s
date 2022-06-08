@@ -125,34 +125,23 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 		return err
 	}
 
-	caCertPath := ""
-	adminKeyPath := ""
-	adminCertPath := ""
 	inClusterKubeconfigPath := "/root/.kube/config"
 	inClusterEtcdDataPath := "/etcd-data"
 	InClusterPrometheusPath := "/etc/prometheus/prometheus.yml"
-	inClusterAdminKeyPath := ""
-	inClusterAdminCertPath := ""
-	inClusterCACertPath := ""
-	inClusterPort := 8080
-	scheme := "http"
 
-	// generate ca cert
-	if conf.SecretPort {
-		err := pki.DumpPki(pkiPath)
-		if err != nil {
-			return fmt.Errorf("failed to generate pki: %s", err)
-		}
-		caCertPath = filepath.Join(pkiPath, "ca.crt")
-		adminKeyPath = filepath.Join(pkiPath, "admin.key")
-		adminCertPath = filepath.Join(pkiPath, "admin.crt")
-		inClusterPkiPath := "/etc/kubernetes/pki/"
-		inClusterCACertPath = filepath.Join(inClusterPkiPath, "ca.crt")
-		inClusterAdminKeyPath = filepath.Join(inClusterPkiPath, "admin.key")
-		inClusterAdminCertPath = filepath.Join(inClusterPkiPath, "admin.crt")
-		inClusterPort = 6443
-		scheme = "https"
+	err = pki.DumpPki(pkiPath)
+	if err != nil {
+		return fmt.Errorf("failed to generate pki: %s", err)
 	}
+	caCertPath := filepath.Join(pkiPath, "ca.crt")
+	adminKeyPath := filepath.Join(pkiPath, "admin.key")
+	adminCertPath := filepath.Join(pkiPath, "admin.crt")
+	inClusterPkiPath := "/etc/kubernetes/pki/"
+	inClusterCACertPath := filepath.Join(inClusterPkiPath, "ca.crt")
+	inClusterAdminKeyPath := filepath.Join(inClusterPkiPath, "admin.key")
+	inClusterAdminCertPath := filepath.Join(inClusterPkiPath, "admin.crt")
+	inClusterPort := 6443
+	scheme := "https"
 
 	// Setup prometheus
 	if conf.PrometheusPort != 0 {
@@ -198,7 +187,6 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 		KubeSchedulerImage:         conf.KubeSchedulerImage,
 		FakeKubeletImage:           conf.FakeKubeletImage,
 		PrometheusImage:            conf.PrometheusImage,
-		SecretPort:                 conf.SecretPort,
 		QuietPull:                  conf.QuietPull,
 		PrometheusPort:             conf.PrometheusPort,
 		GenerateNodeName:           conf.GenerateNodeName,

@@ -59,9 +59,6 @@ var (
 	// PrometheusVersion is the version of Prometheus to use.
 	PrometheusVersion = getEnv("PROMETHEUS_VERSION", "v2.35.0")
 
-	// SecurePort is the Apiserver use TLS.
-	SecurePort = getEnvBool("SECURE_PORT", parseRelease(KubeVersion) > 19)
-
 	// QuietPull is the flag to quiet the pull.
 	QuietPull = getEnvBool("QUIET_PULL", false)
 
