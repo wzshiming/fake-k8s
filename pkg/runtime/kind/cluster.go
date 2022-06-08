@@ -4,30 +4,13 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"encoding/json"
 	"fmt"
-	"github.com/wzshiming/fake-k8s/pkg/runtime"
-	"github.com/wzshiming/fake-k8s/pkg/utils"
 	"os"
 	"path/filepath"
+
+	"github.com/wzshiming/fake-k8s/pkg/runtime"
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
-
-type RawClusterConfig struct {
-	Name    string
-	Workdir string
-	Runtime string
-
-	ClusterConfig
-}
-
-type ClusterConfig struct {
-	UpCommand    []string
-	DownCommand  []string
-	StartCommand []string
-	StopCommand  []string
-
-	ExtConfig json.RawMessage
-}
 
 type Cluster struct {
 	*runtime.Cluster
