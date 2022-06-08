@@ -56,7 +56,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	args := []string{"compose", "up", "-c"}
+	args := []string{"compose", "up", "-d"}
 	if conf.QuietPull {
 		args = append(args, "--quiet-pull")
 	}
