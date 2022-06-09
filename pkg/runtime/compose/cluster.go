@@ -113,14 +113,9 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 	kubeconfigPath := filepath.Join(workdir, runtime.InHostKubeconfigName)
 	prometheusPath := ""
 	inClusterOnHostKubeconfigPath := filepath.Join(workdir, runtime.InClusterKubeconfigName)
-	etcdPath := filepath.Join(workdir, runtime.EtcdDataDirName)
 	pkiPath := filepath.Join(workdir, runtime.PkiName)
 	composePath := filepath.Join(workdir, runtime.ComposeName)
-	err := os.MkdirAll(etcdPath, 0755)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(pkiPath, 0755)
+	err := os.MkdirAll(pkiPath, 0755)
 	if err != nil {
 		return err
 	}
@@ -180,7 +175,6 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 	// Setup compose
 	dockercompose, err := BuildCompose(BuildComposeConfig{
 		ProjectName:                name,
-		EtcdDataPath:               etcdPath,
 		ApiserverPort:              uint32(port),
 		KubeconfigPath:             inClusterOnHostKubeconfigPath,
 		AdminCertPath:              adminCertPath,
