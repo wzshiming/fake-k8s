@@ -1,38 +1,11 @@
 version: "3.1"
 services:
 
-${{ if .PrometheusPath }}
-  # Prometheus
-  prometheus:
-    container_name: "${{ .ProjectName }}-prometheus"
-    image: ${{ .PrometheusImage }}
-    restart: unless-stopped
-    links:
-      - kube_controller_manager
-      - kube_scheduler
-      - kube_apiserver
-      - etcd
-      - fake_kubelet
-    command:
-      - --config.file
-      - ${{ .InClusterPrometheusPath }}
-    ports:
-      - ${{ .PrometheusPort }}:9090
-    volumes:
-      - ${{ .PrometheusPath }}:${{ .InClusterPrometheusPath }}:ro
-${{ if .SecretPort }}
-      - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
-      - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
-      - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
-${{ end }}
-${{ end }}
-
-
   # Etcd
   etcd:
     container_name: "${{ .ProjectName }}-etcd"
     image: ${{ .EtcdImage }}
-    restart: unless-stopped
+    restart: always
     command:
       - etcd
       - --data-dir
@@ -54,7 +27,7 @@ ${{ end }}
   kube_apiserver:
     container_name: "${{ .ProjectName }}-kube-apiserver"
     image: ${{ .KubeApiserverImage }}
-    restart: unless-stopped
+    restart: always
     links:
       - etcd
     ports:
@@ -111,7 +84,7 @@ ${{ end }}
   kube_controller_manager:
     container_name: "${{ .ProjectName }}-kube-controller-manager"
     image: ${{ .KubeControllerManagerImage }}
-    restart: unless-stopped
+    restart: always
     links:
       - kube_apiserver
     command:
@@ -146,7 +119,7 @@ ${{ end }}
   kube_scheduler:
     container_name: "${{ .ProjectName }}-kube-scheduler"
     image: ${{ .KubeSchedulerImage }}
-    restart: unless-stopped
+    restart: always
     links:
       - kube_apiserver
     command:
@@ -181,7 +154,7 @@ ${{ end }}
   fake_kubelet:
     container_name: "${{ .ProjectName }}-fake-kubelet"
     image: ${{ .FakeKubeletImage }}
-    restart: unless-stopped
+    restart: always
     command:
       - --kubeconfig
       - ${{ .InClusterKubeconfigPath }}
@@ -265,6 +238,32 @@ ${{ if .SecretPort }}
       - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
       - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
       - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
+${{ end }}
+
+${{ if .PrometheusPath }}
+  # Prometheus
+  prometheus:
+    container_name: "${{ .ProjectName }}-prometheus"
+    image: ${{ .PrometheusImage }}
+    restart: always
+    links:
+      - kube_controller_manager
+      - kube_scheduler
+      - kube_apiserver
+      - etcd
+      - fake_kubelet
+    command:
+      - --config.file
+      - ${{ .InClusterPrometheusPath }}
+    ports:
+      - ${{ .PrometheusPort }}:9090
+    volumes:
+      - ${{ .PrometheusPath }}:${{ .InClusterPrometheusPath }}:ro
+${{ if .SecretPort }}
+      - ${{ .AdminKeyPath }}:${{ .InClusterAdminKeyPath }}:ro
+      - ${{ .AdminCertPath }}:${{ .InClusterAdminCertPath }}:ro
+      - ${{ .CACertPath }}:${{ .InClusterCACertPath }}:ro
+${{ end }}
 ${{ end }}
 
 # Network
