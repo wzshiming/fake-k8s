@@ -106,7 +106,7 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 12)
+          RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt)
 
   e2e-mock-test-binary:
     runs-on: ubuntu-latest
