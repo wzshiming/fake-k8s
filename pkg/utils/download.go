@@ -12,6 +12,10 @@ import (
 )
 
 func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string, match string, mode fs.FileMode) error {
+	if _, err := os.Stat(dest); err == nil {
+		return nil
+	}
+
 	cacheTar, err := getCache(ctx, cacheDir, src, 0644)
 	if err != nil {
 		return err
@@ -38,28 +42,14 @@ func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string
 	return nil
 }
 
-func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode) (string, error) {
-	cache := filepath.Join(cacheDir, src)
-	if _, err := os.Stat(cache); err != nil {
-		err := Download(ctx, src, cache+".tmp", mode)
-		if err != nil {
-			return "", err
-		}
-		err = os.Rename(cache+".tmp", cache)
-		if err != nil {
-			return "", err
-		}
-	}
-	return cache, nil
-}
-
 func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.FileMode) error {
+	if _, err := os.Stat(dest); err == nil {
+		return nil
+	}
+
 	cache, err := getCache(ctx, cacheDir, src, mode)
 	if err != nil {
 		return err
-	}
-	if _, err := os.Stat(dest); err == nil {
-		return nil
 	}
 
 	err = os.MkdirAll(filepath.Dir(dest), 0755)
@@ -75,58 +65,59 @@ func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.
 	return nil
 }
 
-func Download(ctx context.Context, src, dist string, mode fs.FileMode) error {
-	err := os.MkdirAll(filepath.Dir(dist), 0755)
-	if err != nil {
-		return err
+func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode) (string, error) {
+	cache := filepath.Join(cacheDir, src)
+	if _, err := os.Stat(cache); err == nil {
+		return cache, nil
 	}
 
-	file, err := openSrc(ctx, src)
+	u, err := url.Parse(src)
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer file.Close()
-
-	d, err := os.OpenFile(dist, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-
-	_, err = io.Copy(d, file)
-
-	return err
-}
-
-func openSrc(ctx context.Context, file string) (io.ReadCloser, error) {
-	u, err := url.Parse(file)
-	if err != nil {
-		return nil, err
-	}
-
 	switch u.Scheme {
 	case "http", "https":
 		cli := &http.Client{}
 		req, err := http.NewRequest("GET", u.String(), nil)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		req = req.WithContext(ctx)
 		resp, err := cli.Do(req)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
+		defer resp.Body.Close()
+
 		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("%s: %s", u.String(), resp.Status)
+			return "", fmt.Errorf("%s: %s", u.String(), resp.Status)
 		}
-		return resp.Body, nil
-	case "file", "":
-		file, err := os.OpenFile(u.Path, os.O_RDONLY, 0)
+
+		err = os.MkdirAll(filepath.Dir(cache), 0755)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		return file, nil
+
+		d, err := os.OpenFile(cache+".tmp", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
+		if err != nil {
+			return "", err
+		}
+
+		_, err = io.Copy(d, resp.Body)
+		if err != nil {
+			d.Close()
+			return "", err
+		}
+		d.Close()
+
+		err = os.Rename(cache+".tmp", cache)
+		if err != nil {
+			return "", err
+		}
+		return cache, nil
+	case "file", "":
+		return u.Path, nil
 	default:
-		return nil, fmt.Errorf("unknown scheme %v", u.Scheme)
+		return "", fmt.Errorf("unknown scheme %v", u.Scheme)
 	}
 }
