@@ -19,10 +19,6 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 		Short: "fake-k8s is a fake k8s",
 		Long:  `fake-k8s is a fake k8s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := cmd.Help()
-			if err != nil {
-				return err
-			}
 			return fmt.Errorf("subcommand is required")
 		},
 	}

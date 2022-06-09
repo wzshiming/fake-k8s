@@ -41,13 +41,17 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 	if err != nil {
 		return err
 	}
+	logger.Info("stop cluster", "cluster", name)
 	err = dc.Down(ctx)
 	if err != nil {
-		logger.Info("Failed down", "cluster", name, "err", err)
+		logger.Info("Failed stop cluster", "cluster", name, "err", err)
 	}
+
+	logger.Info("delete cluster", "cluster", name)
 	err = dc.Uninstall(ctx)
 	if err != nil {
 		return err
 	}
+	logger.Info("cluster cleaned", "cluster", name)
 	return nil
 }
