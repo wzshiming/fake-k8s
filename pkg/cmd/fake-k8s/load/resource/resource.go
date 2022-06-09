@@ -28,7 +28,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 			return runE(cmd.Context(), logger, flags)
 		},
 	}
-	cmd.Flags().StringVar(&flags.Name, "name", "default", "cluster name, config")
+	cmd.Flags().StringVar(&flags.Name, "name", "default", "cluster name")
 	cmd.Flags().StringVarP(&flags.File, "file", "f", "", "resource file")
 	return cmd
 }
