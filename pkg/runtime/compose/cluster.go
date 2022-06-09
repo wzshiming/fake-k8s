@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
@@ -29,11 +28,11 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		return err
 	}
 
-	kubeconfigPath := filepath.Join(conf.Workdir, runtime.InHostKubeconfigName)
+	kubeconfigPath := utils.PathJoin(conf.Workdir, runtime.InHostKubeconfigName)
 	prometheusPath := ""
-	inClusterOnHostKubeconfigPath := filepath.Join(conf.Workdir, runtime.InClusterKubeconfigName)
-	pkiPath := filepath.Join(conf.Workdir, runtime.PkiName)
-	composePath := filepath.Join(conf.Workdir, runtime.ComposeName)
+	inClusterOnHostKubeconfigPath := utils.PathJoin(conf.Workdir, runtime.InClusterKubeconfigName)
+	pkiPath := utils.PathJoin(conf.Workdir, runtime.PkiName)
+	composePath := utils.PathJoin(conf.Workdir, runtime.ComposeName)
 
 	caCertPath := ""
 	adminKeyPath := ""
@@ -57,20 +56,20 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate pki: %s", err)
 		}
-		caCertPath = filepath.Join(pkiPath, "ca.crt")
-		adminKeyPath = filepath.Join(pkiPath, "admin.key")
-		adminCertPath = filepath.Join(pkiPath, "admin.crt")
+		caCertPath = utils.PathJoin(pkiPath, "ca.crt")
+		adminKeyPath = utils.PathJoin(pkiPath, "admin.key")
+		adminCertPath = utils.PathJoin(pkiPath, "admin.crt")
 		inClusterPkiPath := "/etc/kubernetes/pki/"
-		inClusterCACertPath = filepath.Join(inClusterPkiPath, "ca.crt")
-		inClusterAdminKeyPath = filepath.Join(inClusterPkiPath, "admin.key")
-		inClusterAdminCertPath = filepath.Join(inClusterPkiPath, "admin.crt")
+		inClusterCACertPath = utils.PathJoin(inClusterPkiPath, "ca.crt")
+		inClusterAdminKeyPath = utils.PathJoin(inClusterPkiPath, "admin.key")
+		inClusterAdminCertPath = utils.PathJoin(inClusterPkiPath, "admin.crt")
 		inClusterPort = 6443
 		scheme = "https"
 	}
 
 	// Setup prometheus
 	if conf.PrometheusPort != 0 {
-		prometheusPath = filepath.Join(conf.Workdir, runtime.Prometheus)
+		prometheusPath = utils.PathJoin(conf.Workdir, runtime.Prometheus)
 		prometheusData, err := BuildPrometheus(BuildPrometheusConfig{
 			ProjectName:  conf.Name,
 			SecretPort:   conf.SecretPort,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -100,7 +99,7 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 
 func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	name := vars.ProjectName + "-" + flags.Name
-	workdir := filepath.Join(vars.TempDir, flags.Name)
+	workdir := utils.PathJoin(vars.TempDir, flags.Name)
 
 	newRuntime, ok := runtime.Get(flags.Runtime)
 	if !ok {

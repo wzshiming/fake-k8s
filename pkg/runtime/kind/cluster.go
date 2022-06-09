@@ -5,11 +5,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
+	"os"
 )
 
 type Cluster struct {
@@ -34,7 +32,7 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(filepath.Join(conf.Workdir, runtime.KindName), []byte(kindYaml), 0644)
+	err = os.WriteFile(utils.PathJoin(conf.Workdir, runtime.KindName), []byte(kindYaml), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write %s: %w", runtime.KindName, err)
 	}
@@ -49,7 +47,7 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(filepath.Join(conf.Workdir, runtime.FakeKubeletDeploy), []byte(fakeKubeletDeploy), 0644)
+	err = os.WriteFile(utils.PathJoin(conf.Workdir, runtime.FakeKubeletDeploy), []byte(fakeKubeletDeploy), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write %s: %w", runtime.FakeKubeletDeploy, err)
 	}
@@ -62,7 +60,7 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(filepath.Join(conf.Workdir, runtime.PrometheusDeploy), []byte(prometheusDeploy), 0644)
+		err = os.WriteFile(utils.PathJoin(conf.Workdir, runtime.PrometheusDeploy), []byte(prometheusDeploy), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write %s: %w", runtime.PrometheusDeploy, err)
 		}
@@ -79,7 +77,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	err = utils.Exec(ctx, "", utils.IOStreams{
 		ErrOut: os.Stderr,
 	}, conf.Runtime, "create", "cluster",
-		"--config", filepath.Join(conf.Workdir, runtime.KindName),
+		"--config", utils.PathJoin(conf.Workdir, runtime.KindName),
 		"--name", conf.Name,
 		"--image", conf.KindNodeImage,
 	)
@@ -112,7 +110,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 	err = c.Kubectl(ctx, utils.IOStreams{
 		ErrOut: os.Stderr,
-	}, "apply", "-f", filepath.Join(conf.Workdir, runtime.FakeKubeletDeploy))
+	}, "apply", "-f", utils.PathJoin(conf.Workdir, runtime.FakeKubeletDeploy))
 	if err != nil {
 		return err
 	}
@@ -139,7 +137,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		}
 		err = c.Kubectl(ctx, utils.IOStreams{
 			ErrOut: os.Stderr,
-		}, "apply", "-f", filepath.Join(conf.Workdir, runtime.PrometheusDeploy))
+		}, "apply", "-f", utils.PathJoin(conf.Workdir, runtime.PrometheusDeploy))
 		if err != nil {
 			return err
 		}

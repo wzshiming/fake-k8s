@@ -3,7 +3,8 @@ package pki
 import (
 	_ "embed"
 	"os"
-	"path/filepath"
+
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
 
 // This is just a local key, it doesn't matter if it is leaked.
@@ -25,15 +26,15 @@ var (
 
 // DumpPki generates a pki directory.
 func DumpPki(dir string) error {
-	err := os.WriteFile(filepath.Join(dir, "ca.crt"), CACrt, 0644)
+	err := os.WriteFile(utils.PathJoin(dir, "ca.crt"), CACrt, 0644)
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(filepath.Join(dir, "admin.key"), AdminKey, 0644)
+	err = os.WriteFile(utils.PathJoin(dir, "admin.key"), AdminKey, 0644)
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(filepath.Join(dir, "admin.crt"), AdminCrt, 0644)
+	err = os.WriteFile(utils.PathJoin(dir, "admin.crt"), AdminCrt, 0644)
 	if err != nil {
 		return err
 	}

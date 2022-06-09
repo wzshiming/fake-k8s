@@ -1,0 +1,101 @@
+name: Test windows
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+jobs:
+  build-k8s:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: kubernetes/kubernetes
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Build k8s
+        shell: bash
+        run: |
+          go build -o kube-apiserver.exe ./cmd/kube-apiserver
+          go build -o kube-controller-manager.exe ./cmd/kube-controller-manager
+          go build -o kube-scheduler.exe ./cmd/kube-scheduler
+      - name: Upload fake-k8s
+        uses: actions/upload-artifact@v2
+        with:
+          name: binary
+          path: |
+            kube-apiserver.exe
+            kube-controller-manager.exe
+            kube-scheduler.exe
+
+  build-fake-k8s:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: wzshiming/fake-k8s
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Build fake-k8s
+        shell: bash
+        run: |
+          go build -o fake-k8s.exe ./cmd/fake-k8s
+      - name: Upload fake-k8s
+        uses: actions/upload-artifact@v2
+        with:
+          name: binary
+          path: fake-k8s.exe
+
+  e2e-test-binary:
+    runs-on: windows-latest
+    needs:
+      - build-fake-k8s
+      - build-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Link binary
+        shell: cmd
+        run: |
+          mklink fake-k8s fake-k8s.exe
+          mklink kube-apiserver kube-apiserver.exe
+          mklink kube-controller-manager kube-controller-manager.exe
+          mklink kube-scheduler scheduler.exe
+      - name: Run test
+        shell: bash
+        run: |
+          KUBE_BINARY_PREFIX=$(pwd) RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 1)
+
+  e2e-mock-test-binary:
+    runs-on: windows-latest
+    needs:
+      - build-fake-k8s
+      - build-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Link binary
+        shell: cmd
+        run: |
+          mklink fake-k8s fake-k8s.exe
+          mklink kube-apiserver kube-apiserver.exe
+          mklink kube-controller-manager kube-controller-manager.exe
+          mklink kube-scheduler scheduler.exe
+      - name: Run test
+        shell: bash
+        run: |
+          KUBE_BINARY_PREFIX=$(pwd) RUNTIME=binary ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)

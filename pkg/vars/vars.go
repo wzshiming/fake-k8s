@@ -2,12 +2,12 @@ package vars
 
 import (
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
 
 var (
@@ -15,10 +15,10 @@ var (
 	ProjectName = "fake-k8s"
 
 	// TempDir creates a temporary directory with the given prefix.
-	TempDir = filepath.Join(os.TempDir(), ProjectName, "clusters")
+	TempDir = utils.PathJoin(os.TempDir(), ProjectName, "clusters")
 
 	// CacheDir creates a cache directory with the given prefix.
-	CacheDir = filepath.Join(os.TempDir(), ProjectName, "cache")
+	CacheDir = utils.PathJoin(os.TempDir(), ProjectName, "cache")
 
 	// Runtime is the runtime to use.
 	Runtime = getEnv("RUNTIME", detectionRuntime())
@@ -93,16 +93,16 @@ var (
 	KubeBinaryPrefix = getEnv("KUBE_BINARY_PREFIX", "https://dl.k8s.io/release/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH)
 
 	// KubeApiserverBinary is the binary of kube-apiserver.
-	KubeApiserverBinary = getEnv("KUBE_APISERVER_BINARY", KubeBinaryPrefix+"/kube-apiserver")
+	KubeApiserverBinary = getEnv("KUBE_APISERVER_BINARY", KubeBinaryPrefix+"/kube-apiserver"+BinSuffix)
 
 	// KubeControllerManagerBinary is the binary of kube-controller-manager.
-	KubeControllerManagerBinary = getEnv("KUBE_CONTROLLER_MANAGER_BINARY", KubeBinaryPrefix+"/kube-controller-manager")
+	KubeControllerManagerBinary = getEnv("KUBE_CONTROLLER_MANAGER_BINARY", KubeBinaryPrefix+"/kube-controller-manager"+BinSuffix)
 
 	// KubeSchedulerBinary is the binary of kube-scheduler.
-	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/kube-scheduler")
+	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/kube-scheduler"+BinSuffix)
 
 	// KubectlBinary is the binary of kubectl.
-	KubectlBinary = getEnv("KUBECTL_BINARY", KubeBinaryPrefix+"/kubectl")
+	KubectlBinary = getEnv("KUBECTL_BINARY", KubeBinaryPrefix+"/kubectl"+BinSuffix)
 
 	// EtcdBinaryPrefix is the prefix of the etcd binary.
 	EtcdBinaryPrefix = getEnv("ETCD_BINARY_PREFIX", "https://github.com/etcd-io/etcd/releases/download")
@@ -119,7 +119,7 @@ var (
 	FakeKubeletBinaryPrefix = getEnv("FAKE_KUBELET_BINARY_PREFIX", "https://github.com/wzshiming/fake-kubelet/releases/download")
 
 	// FakeKubeletBinary is the binary of fake-kubelet.
-	FakeKubeletBinary = getEnv("FAKE_KUBELET_BINARY", FakeKubeletBinaryPrefix+"/"+FakeVersion+"/fake-kubelet_"+runtime.GOOS+"_"+runtime.GOARCH)
+	FakeKubeletBinary = getEnv("FAKE_KUBELET_BINARY", FakeKubeletBinaryPrefix+"/"+FakeVersion+"/fake-kubelet_"+runtime.GOOS+"_"+runtime.GOARCH+BinSuffix)
 
 	// PrometheusBinaryPrefix is the prefix of the Prometheus binary.
 	PrometheusBinaryPrefix = getEnv("PROMETHEUS_BINARY_PREFIX", "https://github.com/prometheus/prometheus/releases/download")
@@ -131,6 +131,13 @@ var (
 		}
 		return "tar.gz"
 	}())
+
+	BinSuffix = func() string {
+		if runtime.GOOS == "windows" {
+			return ".exe"
+		}
+		return ""
+	}()
 )
 
 // getEnv returns the value of the environment variable named by the key.

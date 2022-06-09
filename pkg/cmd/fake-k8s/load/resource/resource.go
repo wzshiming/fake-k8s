@@ -2,12 +2,12 @@ package resource
 
 import (
 	"context"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/resource/load"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
@@ -36,7 +36,7 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	controllerName := "kube-controller-manager"
 	name := vars.ProjectName + "-" + flags.Name
-	workdir := filepath.Join(vars.TempDir, flags.Name)
+	workdir := utils.PathJoin(vars.TempDir, flags.Name)
 
 	dc, err := runtime.Load(name, workdir)
 	if err != nil {

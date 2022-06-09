@@ -3,11 +3,11 @@ package kubeconfig
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
@@ -32,7 +32,7 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 }
 
 func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
-	kubeconfigPath := filepath.Join(vars.TempDir, flags.Name, runtime.InHostKubeconfigName)
+	kubeconfigPath := utils.PathJoin(vars.TempDir, flags.Name, runtime.InHostKubeconfigName)
 
 	data, err := os.ReadFile(kubeconfigPath)
 	if err != nil {
