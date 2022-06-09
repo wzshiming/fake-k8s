@@ -49,10 +49,6 @@ ${{ end }}
       - http://0.0.0.0:2379
       - --initial-cluster
       - node0=http://0.0.0.0:2380
-${{ if .EtcdDataPath }}
-    volumes:
-      - ${{ .EtcdDataPath }}:${{ .InClusterEtcdDataPath }}:rw
-${{ end }}
 
   # Kube-apiserver
   kube_apiserver:

@@ -32,7 +32,6 @@ type BuildComposeConfig struct {
 	FakeKubeletImage           string
 
 	PrometheusPath          string
-	EtcdDataPath            string
 	AdminKeyPath            string
 	AdminCertPath           string
 	CACertPath              string
