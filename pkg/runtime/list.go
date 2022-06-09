@@ -1,4 +1,4 @@
-package list
+package runtime
 
 import (
 	"os"
@@ -24,13 +24,22 @@ func ListClusters(workdir string) ([]string, error) {
 	return ret, nil
 }
 
-// ListImages returns the list of images
-func ListImages() ([]string, error) {
+// ListImagesCompose returns the list of images of compose
+func ListImagesCompose() ([]string, error) {
 	return []string{
 		vars.EtcdImage,
 		vars.KubeApiserverImage,
 		vars.KubeControllerManagerImage,
 		vars.KubeSchedulerImage,
+		vars.FakeKubeletImage,
+		vars.PrometheusImage,
+	}, nil
+}
+
+// ListImagesKind returns the list of images of kind
+func ListImagesKind() ([]string, error) {
+	return []string{
+		vars.KindNodeImage,
 		vars.FakeKubeletImage,
 		vars.PrometheusImage,
 	}, nil
