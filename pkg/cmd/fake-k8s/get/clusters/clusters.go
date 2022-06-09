@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/runtime/list"
+	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
@@ -24,7 +24,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 }
 
 func runE(logger logr.Logger) error {
-	clusters, err := list.ListClusters(vars.TempDir)
+	clusters, err := runtime.ListClusters(vars.TempDir)
 	if err != nil {
 		return err
 	}
