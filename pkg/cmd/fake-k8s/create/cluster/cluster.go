@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
@@ -114,6 +116,7 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 			return err
 		}
 	} else {
+		logger.Info("initializing cluster", "cluster", flags.Name)
 		err = dc.Install(ctx, runtime.Config{
 			Name:                        name,
 			Workdir:                     workdir,
@@ -144,6 +147,7 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 		}
 	}
 
+	logger.Info("starting cluster", "cluster", flags.Name)
 	err = dc.Up(ctx)
 	if err != nil {
 		return fmt.Errorf("failed start %q cluster: %w", name, err)
@@ -158,6 +162,17 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 		if i > 30 {
 			return err
 		}
+	}
+
+	logger.Info("cluster is ready", "cluster", flags.Name)
+
+	fmt.Fprintf(os.Stderr, "> kubectl --context %s get node\n", name)
+	err = utils.Exec(ctx, "", utils.IOStreams{
+		Out:    os.Stderr,
+		ErrOut: os.Stderr,
+	}, "kubectl", "--context", name, "get", "node")
+	if err != nil {
+		return err
 	}
 
 	return nil

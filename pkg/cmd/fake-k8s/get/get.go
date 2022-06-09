@@ -17,10 +17,6 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 		Short: "Gets one of [clusters, images]",
 		Long:  "Gets one of [clusters, images]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := cmd.Help()
-			if err != nil {
-				return err
-			}
 			return fmt.Errorf("subcommand is required")
 		},
 	}
