@@ -281,10 +281,7 @@ spec:
         failureThreshold: 3
       resources:
         requests:
-          cpu: 10m
-          memory: 10Mi
-        limits:
-          cpu: 100m
+          cpu: 500m
           memory: 100Mi
   serviceAccount: fake-kubelet
   serviceAccountName: fake-kubelet

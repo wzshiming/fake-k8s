@@ -3,6 +3,7 @@ package vars
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,9 @@ var (
 
 	// TempDir creates a temporary directory with the given prefix.
 	TempDir = filepath.Join(os.TempDir(), ProjectName, "clusters")
+
+	// CacheDir creates a cache directory with the given prefix.
+	CacheDir = filepath.Join(os.TempDir(), ProjectName, "cache")
 
 	// Runtime is the runtime to use.
 	Runtime = getEnv("RUNTIME", detectionRuntime())
@@ -48,7 +52,7 @@ var (
 	PrometheusPort = getEnvInt("PROMETHEUS_PORT", 0)
 
 	// FakeVersion is the version of the fake to use.
-	FakeVersion = getEnv("FAKE_VERSION", "v0.7.0")
+	FakeVersion = getEnv("FAKE_VERSION", "v0.7.1")
 
 	// KubeVersion is the version of Kubernetes to use.
 	KubeVersion = getEnv("KUBE_VERSION", "v1.24.1")
@@ -95,8 +99,51 @@ var (
 	// PrometheusImage is the image of Prometheus.
 	PrometheusImage = getEnv("PROMETHEUS_IMAGE", joinImageURI(PrometheusImagePrefix, "prometheus", PrometheusVersion))
 
+	// KindNodeImagePrefix is the prefix of the kind node image.
+	KindNodeImagePrefix = getEnv("KIND_NODE_IMAGE_PREFIX", "docker.io/kindest")
+
 	// KindNodeImage is the image of kind node.
-	KindNodeImage = getEnv("KIND_NODE_IMAGE", "docker.io/kindest/node:"+KubeVersion)
+	KindNodeImage = getEnv("KIND_NODE_IMAGE", joinImageURI(KindNodeImagePrefix, "node", KubeVersion))
+
+	// KubeBinaryPrefix is the prefix of the kubernetes binary.
+	KubeBinaryPrefix = getEnv("KUBE_BINARY_PREFIX", "https://dl.k8s.io/release")
+
+	// KubeApiserverBinary is the binary of kube-apiserver.
+	KubeApiserverBinary = getEnv("KUBE_APISERVER_BINARY", KubeBinaryPrefix+"/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH+"/kube-apiserver")
+
+	// KubeControllerManagerBinary is the binary of kube-controller-manager.
+	KubeControllerManagerBinary = getEnv("KUBE_CONTROLLER_MANAGER_BINARY", KubeBinaryPrefix+"/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH+"/kube-controller-manager")
+
+	// KubeSchedulerBinary is the binary of kube-scheduler.
+	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH+"/kube-scheduler")
+
+	// EtcdBinaryPrefix is the prefix of the etcd binary.
+	EtcdBinaryPrefix = getEnv("ETCD_BINARY_PREFIX", "https://github.com/etcd-io/etcd/releases/download")
+
+	// EtcdBinaryTar is the binary of etcd.
+	EtcdBinaryTar = getEnv("ETCD_BINARY_TAR", EtcdBinaryPrefix+"/v"+strings.TrimSuffix(EtcdVersion, "-0")+"/etcd-v"+strings.TrimSuffix(EtcdVersion, "-0")+"-"+runtime.GOOS+"-"+runtime.GOARCH+"."+func() string {
+		if runtime.GOOS == "linux" {
+			return "tar.gz"
+		}
+		return "zip"
+	}())
+
+	// FakeKubeletBinaryPrefix is the prefix of the fake kubelet binary.
+	FakeKubeletBinaryPrefix = getEnv("FAKE_KUBELET_BINARY_PREFIX", "https://github.com/wzshiming/fake-kubelet/releases/download")
+
+	// FakeKubeletBinary is the binary of fake-kubelet.
+	FakeKubeletBinary = getEnv("FAKE_KUBELET_BINARY", FakeKubeletBinaryPrefix+"/"+FakeVersion+"/fake-kubelet_"+runtime.GOOS+"_"+runtime.GOARCH)
+
+	// PrometheusBinaryPrefix is the prefix of the Prometheus binary.
+	PrometheusBinaryPrefix = getEnv("PROMETHEUS_BINARY_PREFIX", "https://github.com/prometheus/prometheus/releases/download")
+
+	// PrometheusBinaryTar is the binary of Prometheus.
+	PrometheusBinaryTar = getEnv("PROMETHEUS_BINARY_TAR", PrometheusBinaryPrefix+"/"+PrometheusVersion+"/prometheus-"+strings.TrimPrefix(PrometheusVersion, "v")+"."+runtime.GOOS+"-"+runtime.GOARCH+"."+func() string {
+		if runtime.GOOS == "windows" {
+			return "zip"
+		}
+		return "tar.gz"
+	}())
 )
 
 // getEnv returns the value of the environment variable named by the key.

@@ -6,7 +6,7 @@ clusters:
   - name: ${{ .ProjectName }}
     cluster:
       server: ${{ .Address }}
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       insecure-skip-tls-verify: true
 ${{ end}}
 contexts:
@@ -14,7 +14,7 @@ contexts:
     context:
       cluster: ${{ .ProjectName }}
 
-${{ if .AdminKeyPath }}
+${{ if .SecretPort }}
       user: ${{ .ProjectName }}
 users:
   - name: ${{ .ProjectName }}

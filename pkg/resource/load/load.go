@@ -45,12 +45,11 @@ func Load(ctx context.Context, kubeconfig, src string) error {
 			In:     inputRaw,
 			Out:    outputRaw,
 			ErrOut: os.Stderr,
-		}, "kubectl", "--kubeconfig", kubeconfig, "apply", "--force=true", "--overwrite=true", "--validate=false", "-o", "json", "-f", "-")
+		}, "kubectl", "--kubeconfig", kubeconfig, "create", "--validate=false", "-o", "json", "-f", "-")
 		if err != nil {
 			for _, obj := range objs {
 				fmt.Fprintf(os.Stderr, "%s/%s failed\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName())
 			}
-			return nil, err
 		}
 		newObj, err := decodeObjects(outputRaw)
 		if err != nil {

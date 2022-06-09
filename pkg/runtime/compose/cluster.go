@@ -89,7 +89,7 @@ func (c *Cluster) Start(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{}, conf.Runtime, "start", name)
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{}, conf.Runtime, "start", conf.Name+"-"+name)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{}, conf.Runtime, "stop", name)
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{}, conf.Runtime, "stop", conf.Name+"-"+name)
 	if err != nil {
 		return err
 	}
@@ -159,6 +159,7 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 		prometheusPath = filepath.Join(workdir, runtime.Prometheus)
 		prometheusData, err := BuildPrometheus(BuildPrometheusConfig{
 			ProjectName:  name,
+			SecretPort:   conf.SecretPort,
 			AdminCrtPath: inClusterAdminCertPath,
 			AdminKeyPath: inClusterAdminKeyPath,
 		})
@@ -212,6 +213,7 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 	// Setup kubeconfig
 	kubeconfigData, err := k8s.BuildKubeconfig(k8s.BuildKubeconfigConfig{
 		ProjectName:  name,
+		SecretPort:   conf.SecretPort,
 		Address:      scheme + "://127.0.0.1:" + strconv.Itoa(port),
 		AdminCrtPath: adminCertPath,
 		AdminKeyPath: adminKeyPath,
@@ -221,6 +223,7 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 	}
 	inClusterKubeconfigData, err := k8s.BuildKubeconfig(k8s.BuildKubeconfigConfig{
 		ProjectName:  name,
+		SecretPort:   conf.SecretPort,
 		Address:      scheme + "://" + name + "-kube-apiserver:" + strconv.Itoa(inClusterPort),
 		AdminCrtPath: inClusterAdminCertPath,
 		AdminKeyPath: inClusterAdminKeyPath,
@@ -248,7 +251,7 @@ func installCluster(ctx context.Context, name, workdir string, conf runtime.Conf
 	// set the context in default kubeconfig
 	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+name+".server", scheme+"://127.0.0.1:"+strconv.Itoa(port))
 	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+name+".cluster", name)
-	if adminKeyPath != "" {
+	if conf.SecretPort {
 		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+name+".insecure-skip-tls-verify", "true")
 		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+name+".user", name)
 		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "users."+name+".client-certificate", adminCertPath)

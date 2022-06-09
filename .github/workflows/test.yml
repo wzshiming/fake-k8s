@@ -70,7 +70,75 @@ jobs:
           chmod +x fake-k8s
           RUNTIME=kind ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 9)
 
-  e2e-test:
+  e2e-mock-test-kind:
+    runs-on: ubuntu-latest
+    needs:
+      - build-fake-k8s
+      - build-fake-kubelet
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for image tar
+        uses: actions/download-artifact@v2
+        with:
+          name: image
+      - name: Load image tar
+        run: |
+          docker load -i image.tar
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run test
+        run: |
+          chmod +x fake-k8s
+          RUNTIME=kind ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
+
+  e2e-test-binary:
+    runs-on: ubuntu-latest
+    needs:
+      - build-fake-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run test
+        run: |
+          chmod +x fake-k8s
+          RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 12)
+
+  e2e-mock-test-binary:
+    runs-on: ubuntu-latest
+    needs:
+      - build-fake-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run test
+        run: |
+          chmod +x fake-k8s
+          RUNTIME=binary ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
+
+  e2e-benchmark-test-binary:
+    runs-on: ubuntu-latest
+    needs:
+      - build-fake-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run benchmark test
+        run: |
+          chmod +x fake-k8s
+          RUNTIME=binary ./fake-k8s.benchmark.test.sh $(cat supported_releases.txt | head -n 1)
+
+  e2e-test-compose:
     runs-on: ubuntu-latest
     needs:
       - build-fake-k8s
@@ -93,7 +161,7 @@ jobs:
           chmod +x fake-k8s
           ./fake-k8s.test.sh $(cat supported_releases.txt)
 
-  e2e-mock-test:
+  e2e-mock-test-compose:
     runs-on: ubuntu-latest
     needs:
       - build-fake-k8s
@@ -116,7 +184,7 @@ jobs:
           chmod +x fake-k8s
           ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
 
-  e2e-benchmark-test:
+  e2e-benchmark-test-compose:
     runs-on: ubuntu-latest
     needs:
       - build-fake-k8s

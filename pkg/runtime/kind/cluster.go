@@ -192,7 +192,7 @@ func (c *Cluster) Start(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", "-it", conf.Name+"-control-plane", "mv", "/etc/kubernetes/"+name+".yaml.bak", "/etc/kubernetes/manifests/"+name+".yaml")
+	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", conf.Name+"-control-plane", "mv", "/etc/kubernetes/"+name+".yaml.bak", "/etc/kubernetes/manifests/"+name+".yaml")
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", "-it", conf.Name+"-control-plane", "mv", "/etc/kubernetes/manifests/"+name+".yaml", "/etc/kubernetes/"+name+".yaml.bak")
+	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "exec", conf.Name+"-control-plane", "mv", "/etc/kubernetes/manifests/"+name+".yaml", "/etc/kubernetes/"+name+".yaml.bak")
 	if err != nil {
 		return err
 	}
