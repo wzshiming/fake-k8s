@@ -106,16 +106,16 @@ var (
 	KindNodeImage = getEnv("KIND_NODE_IMAGE", joinImageURI(KindNodeImagePrefix, "node", KubeVersion))
 
 	// KubeBinaryPrefix is the prefix of the kubernetes binary.
-	KubeBinaryPrefix = getEnv("KUBE_BINARY_PREFIX", "https://dl.k8s.io/release")
+	KubeBinaryPrefix = getEnv("KUBE_BINARY_PREFIX", "https://dl.k8s.io/release/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH)
 
 	// KubeApiserverBinary is the binary of kube-apiserver.
-	KubeApiserverBinary = getEnv("KUBE_APISERVER_BINARY", KubeBinaryPrefix+"/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH+"/kube-apiserver")
+	KubeApiserverBinary = getEnv("KUBE_APISERVER_BINARY", KubeBinaryPrefix+"/kube-apiserver")
 
 	// KubeControllerManagerBinary is the binary of kube-controller-manager.
-	KubeControllerManagerBinary = getEnv("KUBE_CONTROLLER_MANAGER_BINARY", KubeBinaryPrefix+"/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH+"/kube-controller-manager")
+	KubeControllerManagerBinary = getEnv("KUBE_CONTROLLER_MANAGER_BINARY", KubeBinaryPrefix+"/kube-controller-manager")
 
 	// KubeSchedulerBinary is the binary of kube-scheduler.
-	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/"+KubeVersion+"/bin/"+runtime.GOOS+"/"+runtime.GOARCH+"/kube-scheduler")
+	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/kube-scheduler")
 
 	// EtcdBinaryPrefix is the prefix of the etcd binary.
 	EtcdBinaryPrefix = getEnv("ETCD_BINARY_PREFIX", "https://github.com/etcd-io/etcd/releases/download")

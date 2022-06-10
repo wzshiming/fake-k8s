@@ -67,20 +67,23 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	cmd.Flags().StringVar(&flags.KubeSchedulerImage, "kube-scheduler-image", vars.KubeSchedulerImage, `image of kube-scheduler, only for docker/nerdctl runtime
 '${KUBE_IMAGE_PREFIX}/kube-scheduler:${KUBE_VERSION}'
 `)
-	cmd.Flags().StringVar(&flags.FakeKubeletImage, "fake-kubelet-image", vars.FakeKubeletImage, `image of fake-kubelet, only for docker/nerdctl runtime
+	cmd.Flags().StringVar(&flags.FakeKubeletImage, "fake-kubelet-image", vars.FakeKubeletImage, `image of fake-kubelet, only for docker/nerdctl/kind runtime
 '${FAKE_IMAGE_PREFIX}/fake-kubelet:${FAKE_VERSION}'
 `)
-	cmd.Flags().StringVar(&flags.PrometheusImage, "prometheus-image", vars.PrometheusImage, `image of Prometheus, only for docker/nerdctl runtime
+	cmd.Flags().StringVar(&flags.PrometheusImage, "prometheus-image", vars.PrometheusImage, `image of Prometheus, only for docker/nerdctl/kind runtime
 '${PROMETHEUS_IMAGE_PREFIX}/prometheus:${PROMETHEUS_VERSION}'
 `)
 	cmd.Flags().StringVar(&flags.KindNodeImage, "kind-node-image", vars.KindNodeImage, `image of kind node, only for kind runtime
 '${KIND_NODE_IMAGE_PREFIX}/node:${KUBE_VERSION}'
 `)
 	cmd.Flags().StringVar(&flags.KubeApiserverBinary, "kube-apiserver-binary", vars.KubeApiserverBinary, `binary of kube-apiserver, only for binary runtime
+'${KUBE_BINARY_PREFIX}/kube-apiserver'
 `)
 	cmd.Flags().StringVar(&flags.KubeControllerManagerBinary, "kube-controller-manager-binary", vars.KubeControllerManagerBinary, `binary of kube-controller-manager, only for binary runtime
+'${KUBE_BINARY_PREFIX}/kube-controller-manager'
 `)
 	cmd.Flags().StringVar(&flags.KubeSchedulerBinary, "kube-scheduler-binary", vars.KubeSchedulerBinary, `binary of kube-scheduler, only for binary runtime
+'${KUBE_BINARY_PREFIX}/kube-scheduler'
 `)
 	cmd.Flags().StringVar(&flags.FakeKubeletBinary, "fake-kubelet-binary", vars.FakeKubeletBinary, `binary of fake-kubelet, only for binary runtime
 `)
