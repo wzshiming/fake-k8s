@@ -85,22 +85,22 @@ func (c *Cluster) Install(ctx context.Context, conf Config) error {
 }
 
 func (c *Cluster) Uninstall(ctx context.Context) error {
-	r, err := c.Config()
+	conf, err := c.Config()
 	if err != nil {
 		return err
 	}
 
 	// cleanup workdir
-	os.RemoveAll(r.Workdir)
+	os.RemoveAll(conf.Workdir)
 	return nil
 }
 
 func (c *Cluster) Ready(ctx context.Context) (bool, error) {
-	r, err := c.Config()
+	conf, err := c.Config()
 	if err != nil {
 		return false, err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "--kubeconfig", filepath.Join(r.Workdir, InHostKubeconfigName), "get", "node")
+	err = utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "--kubeconfig", filepath.Join(conf.Workdir, InHostKubeconfigName), "get", "node")
 	if err != nil {
 		return false, err
 	}
