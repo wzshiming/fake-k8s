@@ -34,38 +34,38 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 	bin := filepath.Join(conf.Workdir, "bin")
 
 	kubeApiserverPath := filepath.Join(bin, "kube-apiserver")
-	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeApiserverBinary, kubeApiserverPath, 0755)
+	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeApiserverBinary, kubeApiserverPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	kubeControllerManagerPath := filepath.Join(bin, "kube-controller-manager")
-	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeControllerManagerBinary, kubeControllerManagerPath, 0755)
+	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeControllerManagerBinary, kubeControllerManagerPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	kubeSchedulerPath := filepath.Join(bin, "kube-scheduler")
-	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeSchedulerBinary, kubeSchedulerPath, 0755)
+	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeSchedulerBinary, kubeSchedulerPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	fakeKubeletPath := filepath.Join(bin, "fake-kubelet")
-	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.FakeKubeletBinary, fakeKubeletPath, 0755)
+	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.FakeKubeletBinary, fakeKubeletPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	etcdPath := filepath.Join(bin, "etcd")
-	err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.EtcdBinaryTar, etcdPath, "etcd", 0755)
+	err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.EtcdBinaryTar, etcdPath, "etcd", 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	if conf.PrometheusPort != 0 {
 		prometheusPath := filepath.Join(bin, "prometheus")
-		err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.PrometheusBinaryTar, prometheusPath, "prometheus", 0755)
+		err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.PrometheusBinaryTar, prometheusPath, "prometheus", 0755, conf.QuietPull)
 		if err != nil {
 			return err
 		}

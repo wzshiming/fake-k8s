@@ -9,14 +9,16 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 )
 
-func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string, match string, mode fs.FileMode) error {
+func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string, match string, mode fs.FileMode, quiet bool) error {
 	if _, err := os.Stat(dest); err == nil {
 		return nil
 	}
 
-	cacheTar, err := getCache(ctx, cacheDir, src, 0644)
+	cacheTar, err := getCache(ctx, cacheDir, src, 0644, quiet)
 	if err != nil {
 		return err
 	}
@@ -42,12 +44,12 @@ func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string
 	return nil
 }
 
-func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.FileMode) error {
+func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.FileMode, quiet bool) error {
 	if _, err := os.Stat(dest); err == nil {
 		return nil
 	}
 
-	cache, err := getCache(ctx, cacheDir, src, mode)
+	cache, err := getCache(ctx, cacheDir, src, mode, quiet)
 	if err != nil {
 		return err
 	}
@@ -65,7 +67,7 @@ func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.
 	return nil
 }
 
-func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode) (string, error) {
+func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet bool) (string, error) {
 	cache := filepath.Join(cacheDir, src)
 	if _, err := os.Stat(cache); err == nil {
 		return cache, nil
@@ -89,6 +91,7 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode) (stri
 		}
 		defer resp.Body.Close()
 
+		contentLength := resp.Header.Get("Content-Length")
 		if resp.StatusCode != 200 {
 			return "", fmt.Errorf("%s: %s", u.String(), resp.Status)
 		}
@@ -103,9 +106,28 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode) (stri
 			return "", err
 		}
 
-		_, err = io.Copy(d, resp.Body)
+		var srcReader io.Reader = resp.Body
+		if !quiet {
+			message := filepath.Base(src)
+			pb := NewProgressBar(func(total, current int, elapsed time.Duration) string {
+				if total >= current {
+					return "Download Complete " + message
+				}
+				return "Downloading " + message
+			})
+
+			contentLengthInt, _ := strconv.Atoi(contentLength)
+			counter := newCounterWriter(func(counter int) {
+				pb.Update(counter, contentLengthInt)
+				pb.Print()
+			})
+			srcReader = io.TeeReader(srcReader, counter)
+		}
+
+		_, err = io.Copy(d, srcReader)
 		if err != nil {
 			d.Close()
+			fmt.Println()
 			return "", err
 		}
 		d.Close()
@@ -120,4 +142,20 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode) (stri
 	default:
 		return "", fmt.Errorf("unknown scheme %v", u.Scheme)
 	}
+}
+
+type counterWriter struct {
+	fun     func(counter int)
+	counter int
+}
+
+func newCounterWriter(fun func(counter int)) *counterWriter {
+	return &counterWriter{
+		fun: fun,
+	}
+}
+func (c *counterWriter) Write(b []byte) (int, error) {
+	c.counter += len(b)
+	c.fun(c.counter)
+	return len(b), nil
 }

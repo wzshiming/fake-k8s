@@ -3,13 +3,13 @@ package create
 import (
 	"fmt"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/create/cluster"
 )
 
 // NewCommand returns a new cobra.Command for cluster creation
-func NewCommand(logger logr.Logger) *cobra.Command {
+func NewCommand(logger cmd.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "create",

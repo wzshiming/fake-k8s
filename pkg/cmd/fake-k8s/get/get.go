@@ -3,8 +3,8 @@ package get
 import (
 	"fmt"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/binaries"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/clusters"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/images"
@@ -12,7 +12,7 @@ import (
 )
 
 // NewCommand returns a new cobra.Command for get
-func NewCommand(logger logr.Logger) *cobra.Command {
+func NewCommand(logger cmd.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "get",

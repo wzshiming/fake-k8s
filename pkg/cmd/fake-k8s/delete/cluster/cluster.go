@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
@@ -17,7 +17,7 @@ type flagpole struct {
 }
 
 // NewCommand returns a new cobra.Command for cluster creation
-func NewCommand(logger logr.Logger) *cobra.Command {
+func NewCommand(logger cmd.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
@@ -33,7 +33,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	return cmd
 }
 
-func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
+func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	name := vars.ProjectName + "-" + flags.Name
 	workdir := filepath.Join(vars.TempDir, flags.Name)
 
@@ -41,17 +41,17 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 	if err != nil {
 		return err
 	}
-	logger.Info("stop cluster", "cluster", name)
+	logger.Printf("Stopping cluster %q", name)
 	err = dc.Down(ctx)
 	if err != nil {
-		logger.Info("Failed stop cluster", "cluster", name, "err", err)
+		logger.Printf("Error stopping cluster %q: %v", name, err)
 	}
 
-	logger.Info("delete cluster", "cluster", name)
+	logger.Printf("Deleting cluster %q", name)
 	err = dc.Uninstall(ctx)
 	if err != nil {
 		return err
 	}
-	logger.Info("cluster cleaned", "cluster", name)
+	logger.Printf("Cluster %q deleted", name)
 	return nil
 }
