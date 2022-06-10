@@ -44,3 +44,15 @@ func ListImagesKind() ([]string, error) {
 		vars.PrometheusImage,
 	}, nil
 }
+
+// ListBinaries returns the list of binaries
+func ListBinaries() ([]string, error) {
+	return []string{
+		vars.EtcdBinaryTar,
+		vars.KubeApiserverBinary,
+		vars.KubeControllerManagerBinary,
+		vars.KubeSchedulerBinary,
+		vars.FakeKubeletBinary,
+		vars.PrometheusBinaryTar,
+	}, nil
+}
