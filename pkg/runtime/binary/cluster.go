@@ -143,6 +143,10 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"http://0.0.0.0:" + etcdClientPortStr,
 		"--initial-cluster",
 		"node0=http://0.0.0.0:" + etcdPeerPortStr,
+		"--auto-compaction-retention",
+		"1",
+		"--quota-backend-bytes",
+		"8589934592",
 	}
 	err = utils.ForkExec(conf.Workdir, etcdPath, etcdArgs...)
 	if err != nil {

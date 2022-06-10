@@ -22,6 +22,10 @@ services:
       - http://0.0.0.0:2379
       - --initial-cluster
       - node0=http://0.0.0.0:2380
+      - --auto-compaction-retention
+      - "1"
+      - --quota-backend-bytes
+      - "8589934592"
 
   # Kube-apiserver
   kube_apiserver:
