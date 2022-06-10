@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
-	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
 
 var (
@@ -200,11 +199,8 @@ func parseRelease(version string) int {
 }
 
 func detectionRuntime() string {
-	runtimes := []string{"docker", "nerdctl"}
-	for _, r := range runtimes {
-		if _, err := utils.LookPath(r); err == nil {
-			return r
-		}
+	if runtime.GOOS == "linux" {
+		return "binary"
 	}
-	return runtimes[0]
+	return "docker"
 }

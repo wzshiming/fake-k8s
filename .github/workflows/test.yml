@@ -159,7 +159,7 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          ./fake-k8s.test.sh $(cat supported_releases.txt)
+          RUNTIME=docker ./fake-k8s.test.sh $(cat supported_releases.txt)
 
   e2e-mock-test-compose:
     runs-on: ubuntu-latest
@@ -182,7 +182,7 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
+          RUNTIME=docker ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
 
   e2e-benchmark-test-compose:
     runs-on: ubuntu-latest
@@ -205,4 +205,4 @@ jobs:
       - name: Run benchmark test
         run: |
           chmod +x fake-k8s
-          ./fake-k8s.benchmark.test.sh $(cat supported_releases.txt | head -n 1)
+          RUNTIME=docker ./fake-k8s.benchmark.test.sh $(cat supported_releases.txt | head -n 1)
