@@ -1,4 +1,4 @@
-package images
+package binaries
 
 import (
 	"fmt"
@@ -19,9 +19,9 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
-		Use:   "images",
-		Short: "Lists images used by fake cluster, only for docker/nertctl/kind runtime",
-		Long:  "Lists images used by fake cluster, only for docker/nertctl/kind runtime",
+		Use:   "binaries",
+		Short: "Lists binaries used by fake cluster, only for binary runtime",
+		Long:  "Lists binaries used by fake cluster, only for binary runtime",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runE(logger, flags)
 		},
@@ -34,12 +34,10 @@ func runE(logger logr.Logger, flags *flagpole) error {
 	var images []string
 	var err error
 	switch flags.Runtime {
-	case "docker", "nertctl":
-		images, err = runtime.ListImagesCompose()
-	case "kind":
-		images, err = runtime.ListImagesKind()
-	case "binary":
+	case "docker", "nertctl", "kind":
 		images = nil
+	case "binary":
+		images, err = runtime.ListBinaries()
 	default:
 		return fmt.Errorf("unknown runtime: %s", flags.Runtime)
 	}
