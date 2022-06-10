@@ -13,7 +13,7 @@ import (
 
 var (
 	// ProjectName is the name of the project.
-	ProjectName = getEnv("PROJECT_NAME", "fake-k8s")
+	ProjectName = "fake-k8s"
 
 	// TempDir creates a temporary directory with the given prefix.
 	TempDir = filepath.Join(os.TempDir(), ProjectName, "clusters")
@@ -24,26 +24,11 @@ var (
 	// Runtime is the runtime to use.
 	Runtime = getEnv("RUNTIME", detectionRuntime())
 
-	// Mock is the mock data to use.
-	Mock = getEnv("MOCK", "")
-
 	// GenerateReplicas is the number of replicas to generate.
-	GenerateReplicas = getEnvInt("GENERATE_REPLICAS", func() int {
-		if Mock == "" {
-			return 5
-		} else {
-			return 0
-		}
-	}())
+	GenerateReplicas = getEnvInt("GENERATE_REPLICAS", 5)
 
 	// GenerateNodeName is the name of the node to generate.
-	GenerateNodeName = getEnv("GENERATE_NODE_NAME", func() string {
-		if Mock == "" {
-			return "fake-"
-		} else {
-			return ""
-		}
-	}())
+	GenerateNodeName = getEnv("GENERATE_NODE_NAME", "fake-")
 
 	// NodeName is the name of the node to use.
 	NodeName = strings.Split(getEnv("NODE_NAME", ""), ",")
