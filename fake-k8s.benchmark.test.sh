@@ -43,6 +43,7 @@ function wait_resource() {
 
 function gen_pods() {
   local size="${1}"
+  local node_name="${2}"
   for ((i = 0; i < "${size}"; i++)); do
     cat <<EOF
 ---
@@ -57,14 +58,16 @@ spec:
   containers:
   - name: fake-pod
     image: fake
-  nodeName: fake-0
+  nodeName: ${node_name}
 EOF
   done
 }
 
 function test_create_pod() {
   local size="${1}"
-  gen_pods "${size}" | kubectl --context=fake-k8s-default create -f - >/dev/null 2>&1 &
+  local node_name
+  node_name="$(kubectl --context=fake-k8s-default get node -o jsonpath='{.items.*.metadata.name}' | tr ' ' '\n' | grep fake- | head -n 1)"
+  gen_pods "${size}" "${node_name}" | kubectl --context=fake-k8s-default create -f - >/dev/null 2>&1 &
   wait_resource Pod Running "${size}"
 }
 
