@@ -1,5 +1,8 @@
 # fake-k8s
 
+[![Build](https://github.com/wzshiming/fake-k8s/actions/workflows/go-cross-build.yml/badge.svg)](https://github.com/wzshiming/fake-k8s/actions/workflows/go-cross-build.yml)
+[![GitHub license](https://img.shields.io/github/license/wzshiming/fake-k8s.svg)](https://github.com/wzshiming/fake-k8s/blob/master/LICENSE)
+
 fake-k8s is a tool for running Fake Kubernetes clusters
 
 [The old version](https://github.com/wzshiming/fake-k8s/blob/v0.1.1/fake-k8s.sh) uses shell implementation and is no longer maintained
