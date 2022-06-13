@@ -114,40 +114,37 @@ func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	_, err = dc.Config()
 	if err == nil {
 		logger.Printf("Cluster %q already exists", name)
-		dc, err = runtime.Load(name, workdir)
-		if err != nil {
-			return err
-		}
-	} else {
-		logger.Printf("Creating cluster %q", name)
-		err = dc.Install(ctx, runtime.Config{
-			Name:                        name,
-			Workdir:                     workdir,
-			Runtime:                     flags.Runtime,
-			PrometheusImage:             flags.PrometheusImage,
-			EtcdImage:                   flags.EtcdImage,
-			KubeApiserverImage:          flags.KubeApiserverImage,
-			KubeControllerManagerImage:  flags.KubeControllerManagerImage,
-			KubeSchedulerImage:          flags.KubeSchedulerImage,
-			FakeKubeletImage:            flags.FakeKubeletImage,
-			KindNodeImage:               flags.KindNodeImage,
-			KubeApiserverBinary:         flags.KubeApiserverBinary,
-			KubeControllerManagerBinary: flags.KubeControllerManagerBinary,
-			KubeSchedulerBinary:         flags.KubeSchedulerBinary,
-			FakeKubeletBinary:           flags.FakeKubeletBinary,
-			EtcdBinaryTar:               flags.EtcdBinaryTar,
-			PrometheusBinaryTar:         flags.PrometheusBinaryTar,
-			CacheDir:                    vars.CacheDir,
-			SecretPort:                  flags.SecurePort,
-			QuietPull:                   flags.QuietPull,
-			PrometheusPort:              flags.PrometheusPort,
-			GenerateNodeName:            flags.GenerateNodeName,
-			GenerateReplicas:            flags.GenerateReplicas,
-			NodeName:                    strings.Join(flags.NodeName, ","),
-		})
-		if err != nil {
-			return fmt.Errorf("failed install %q cluster: %w", name, err)
-		}
+		return nil
+	}
+
+	logger.Printf("Creating cluster %q", name)
+	err = dc.Install(ctx, runtime.Config{
+		Name:                        name,
+		Workdir:                     workdir,
+		Runtime:                     flags.Runtime,
+		PrometheusImage:             flags.PrometheusImage,
+		EtcdImage:                   flags.EtcdImage,
+		KubeApiserverImage:          flags.KubeApiserverImage,
+		KubeControllerManagerImage:  flags.KubeControllerManagerImage,
+		KubeSchedulerImage:          flags.KubeSchedulerImage,
+		FakeKubeletImage:            flags.FakeKubeletImage,
+		KindNodeImage:               flags.KindNodeImage,
+		KubeApiserverBinary:         flags.KubeApiserverBinary,
+		KubeControllerManagerBinary: flags.KubeControllerManagerBinary,
+		KubeSchedulerBinary:         flags.KubeSchedulerBinary,
+		FakeKubeletBinary:           flags.FakeKubeletBinary,
+		EtcdBinaryTar:               flags.EtcdBinaryTar,
+		PrometheusBinaryTar:         flags.PrometheusBinaryTar,
+		CacheDir:                    vars.CacheDir,
+		SecretPort:                  flags.SecurePort,
+		QuietPull:                   flags.QuietPull,
+		PrometheusPort:              flags.PrometheusPort,
+		GenerateNodeName:            flags.GenerateNodeName,
+		GenerateReplicas:            flags.GenerateReplicas,
+		NodeName:                    strings.Join(flags.NodeName, ","),
+	})
+	if err != nil {
+		return fmt.Errorf("failed install %q cluster: %w", name, err)
 	}
 
 	logger.Printf("Starting cluster %q", name)
