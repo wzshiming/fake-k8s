@@ -94,6 +94,7 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 
 	return nil
 }
+
 func (c *Cluster) Up(ctx context.Context) error {
 	conf, err := c.Config()
 	if err != nil {
@@ -104,6 +105,9 @@ func (c *Cluster) Up(ctx context.Context) error {
 		scheme = "https"
 	}
 	bin := filepath.Join(conf.Workdir, "bin")
+
+	localAddress := "127.0.0.1"
+	serveAddress := "0.0.0.0"
 
 	kubeApiserverPath := filepath.Join(bin, "kube-apiserver")
 	kubeControllerManagerPath := filepath.Join(bin, "kube-controller-manager")
@@ -134,15 +138,15 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"--name",
 		"node0",
 		"--initial-advertise-peer-urls",
-		"http://0.0.0.0:" + etcdPeerPortStr,
+		"http://" + localAddress + ":" + etcdPeerPortStr,
 		"--listen-peer-urls",
-		"http://0.0.0.0:" + etcdPeerPortStr,
+		"http://" + localAddress + ":" + etcdPeerPortStr,
 		"--advertise-client-urls",
-		"http://0.0.0.0:" + etcdClientPortStr,
+		"http://" + localAddress + ":" + etcdClientPortStr,
 		"--listen-client-urls",
-		"http://0.0.0.0:" + etcdClientPortStr,
+		"http://" + localAddress + ":" + etcdClientPortStr,
 		"--initial-cluster",
-		"node0=http://0.0.0.0:" + etcdPeerPortStr,
+		"node0=http://" + localAddress + ":" + etcdPeerPortStr,
 		"--auto-compaction-retention",
 		"1",
 		"--quota-backend-bytes",
@@ -163,7 +167,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"--admission-control",
 		"",
 		"--etcd-servers",
-		"http://127.0.0.1:" + etcdClientPortStr,
+		"http://" + localAddress + ":" + etcdClientPortStr,
 		"--etcd-prefix",
 		"/prefix/registry",
 		"--default-watch-cache-size",
@@ -173,7 +177,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if conf.SecretPort {
 		kubeApiserverArgs = append(kubeApiserverArgs,
 			"--bind-address",
-			"0.0.0.0",
+			serveAddress,
 			"--secure-port",
 			apiserverPortStr,
 			"--tls-cert-file",
@@ -192,7 +196,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	} else {
 		kubeApiserverArgs = append(kubeApiserverArgs,
 			"--insecure-bind-address",
-			"0.0.0.0",
+			serveAddress,
 			"--insecure-port",
 			apiserverPortStr,
 			"--cert-dir",
@@ -207,7 +211,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	kubeconfigData, err := k8s.BuildKubeconfig(k8s.BuildKubeconfigConfig{
 		ProjectName:  conf.Name,
 		SecretPort:   conf.SecretPort,
-		Address:      scheme + "://127.0.0.1:" + apiserverPortStr,
+		Address:      scheme + "://" + localAddress + ":" + apiserverPortStr,
 		AdminCrtPath: adminCertPath,
 		AdminKeyPath: adminKeyPath,
 	})
@@ -244,7 +248,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if conf.SecretPort {
 		kubeControllerManagerArgs = append(kubeControllerManagerArgs,
 			"--bind-address",
-			"0.0.0.0",
+			localAddress,
 			"--secure-port",
 			strconv.Itoa(kubeControllerManagerPort),
 			"--authorization-always-allow-paths",
@@ -253,7 +257,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	} else {
 		kubeControllerManagerArgs = append(kubeControllerManagerArgs,
 			"--address",
-			"0.0.0.0",
+			localAddress,
 			"--port",
 			strconv.Itoa(kubeControllerManagerPort),
 			"--secure-port",
@@ -277,7 +281,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if conf.SecretPort {
 		kubeSchedulerArgs = append(kubeSchedulerArgs,
 			"--bind-address",
-			"0.0.0.0",
+			localAddress,
 			"--secure-port",
 			strconv.Itoa(kubeSchedulerPort),
 			"--authorization-always-allow-paths",
@@ -286,7 +290,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	} else {
 		kubeSchedulerArgs = append(kubeSchedulerArgs,
 			"--address",
-			"0.0.0.0",
+			localAddress,
 			"--port",
 			strconv.Itoa(kubeSchedulerPort),
 			"--secure-port",
@@ -325,7 +329,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		}
 		fakeKubeletArgs = append(fakeKubeletArgs,
 			"--server-address",
-			"0.0.0.0:"+strconv.Itoa(fakeKubeletPort),
+			localAddress+":"+strconv.Itoa(fakeKubeletPort),
 		)
 	}
 	err = utils.ForkExec(conf.Workdir, fakeKubeletPath, fakeKubeletArgs...)
@@ -362,7 +366,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			"--config.file",
 			prometheusConfigPath,
 			"--web.listen-address",
-			"0.0.0.0:" + prometheusPortStr,
+			serveAddress + ":" + prometheusPortStr,
 		}
 		err = utils.ForkExec(conf.Workdir, prometheusPath, prometheusArgs...)
 		if err != nil {
@@ -371,7 +375,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	// set the context in default kubeconfig
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+conf.Name+".server", scheme+"://127.0.0.1:"+apiserverPortStr)
+	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+conf.Name+".server", scheme+"://"+localAddress+":"+apiserverPortStr)
 	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".cluster", conf.Name)
 	if conf.SecretPort {
 		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+conf.Name+".insecure-skip-tls-verify", "true")
