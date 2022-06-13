@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
@@ -40,7 +40,7 @@ type flagpole struct {
 }
 
 // NewCommand returns a new cobra.Command for cluster creation
-func NewCommand(logger logr.Logger) *cobra.Command {
+func NewCommand(logger cmd.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
@@ -98,7 +98,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	return cmd
 }
 
-func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
+func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	name := vars.ProjectName + "-" + flags.Name
 	workdir := filepath.Join(vars.TempDir, flags.Name)
 
@@ -113,13 +113,13 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 	}
 	_, err = dc.Config()
 	if err == nil {
-		logger.Info("cluster is existing", "cluster", flags.Name)
+		logger.Printf("Cluster %q already exists", name)
 		dc, err = runtime.Load(name, workdir)
 		if err != nil {
 			return err
 		}
 	} else {
-		logger.Info("initializing cluster", "cluster", flags.Name)
+		logger.Printf("Creating cluster %q", name)
 		err = dc.Install(ctx, runtime.Config{
 			Name:                        name,
 			Workdir:                     workdir,
@@ -150,12 +150,13 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 		}
 	}
 
-	logger.Info("starting cluster", "cluster", flags.Name)
+	logger.Printf("Starting cluster %q", name)
 	err = dc.Up(ctx)
 	if err != nil {
 		return fmt.Errorf("failed start %q cluster: %w", name, err)
 	}
 
+	logger.Printf("Wait for cluster %q to be ready", name)
 	for i := 0; ; i++ {
 		ready, err := dc.Ready(ctx)
 		if ready {
@@ -167,7 +168,7 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 		}
 	}
 
-	logger.Info("cluster is ready", "cluster", flags.Name)
+	logger.Printf("Cluster %q is ready", name)
 
 	fmt.Fprintf(os.Stderr, "> kubectl --context %s get node\n", name)
 	err = utils.Exec(ctx, "", utils.IOStreams{
@@ -177,6 +178,5 @@ func runE(ctx context.Context, logger logr.Logger, flags *flagpole) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

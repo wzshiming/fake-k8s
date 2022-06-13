@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
@@ -15,7 +15,7 @@ type flagpole struct {
 }
 
 // NewCommand returns a new cobra.Command for getting the list of clusters
-func NewCommand(logger logr.Logger) *cobra.Command {
+func NewCommand(logger cmd.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
@@ -30,7 +30,7 @@ func NewCommand(logger logr.Logger) *cobra.Command {
 	return cmd
 }
 
-func runE(logger logr.Logger, flags *flagpole) error {
+func runE(logger cmd.Logger, flags *flagpole) error {
 	var images []string
 	var err error
 	switch flags.Runtime {
@@ -39,14 +39,15 @@ func runE(logger logr.Logger, flags *flagpole) error {
 	case "kind":
 		images, err = runtime.ListImagesKind()
 	case "binary":
-		images = nil
+		logger.Printf("no images need to be pull for %s", flags.Runtime)
+		return nil
 	default:
 		return fmt.Errorf("unknown runtime: %s", flags.Runtime)
 	}
-
 	if err != nil {
 		return err
 	}
+
 	for _, image := range images {
 		fmt.Println(image)
 	}
