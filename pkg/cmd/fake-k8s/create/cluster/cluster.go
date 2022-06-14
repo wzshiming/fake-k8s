@@ -168,10 +168,10 @@ func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	logger.Printf("Cluster %q is ready", name)
 
 	fmt.Fprintf(os.Stderr, "> kubectl --context %s get node\n", name)
-	err = utils.Exec(ctx, "", utils.IOStreams{
+	err = dc.Kubectl(ctx, utils.IOStreams{
 		Out:    os.Stderr,
 		ErrOut: os.Stderr,
-	}, "kubectl", "--context", name, "get", "node")
+	}, "--context", name, "get", "node")
 	if err != nil {
 		return err
 	}

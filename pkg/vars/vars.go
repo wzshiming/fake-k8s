@@ -101,6 +101,9 @@ var (
 	// KubeSchedulerBinary is the binary of kube-scheduler.
 	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/kube-scheduler")
 
+	// KubectlBinary is the binary of kubectl.
+	KubectlBinary = getEnv("KUBECTL_BINARY", KubeBinaryPrefix+"/kubectl")
+
 	// EtcdBinaryPrefix is the prefix of the etcd binary.
 	EtcdBinaryPrefix = getEnv("ETCD_BINARY_PREFIX", "https://github.com/etcd-io/etcd/releases/download")
 

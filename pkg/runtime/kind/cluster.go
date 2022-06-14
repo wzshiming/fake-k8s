@@ -86,7 +86,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "cordon", conf.Name+"-control-plane")
+	err = c.Kubectl(ctx, utils.IOStreams{}, "cordon", conf.Name+"-control-plane")
 	if err != nil {
 		return err
 	}
@@ -110,9 +110,9 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{
+	err = c.Kubectl(ctx, utils.IOStreams{
 		ErrOut: os.Stderr,
-	}, "kubectl", "apply", "-f", filepath.Join(conf.Workdir, runtime.FakeKubeletDeploy))
+	}, "apply", "-f", filepath.Join(conf.Workdir, runtime.FakeKubeletDeploy))
 	if err != nil {
 		return err
 	}
@@ -137,9 +137,9 @@ func (c *Cluster) Up(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = utils.Exec(ctx, "", utils.IOStreams{
+		err = c.Kubectl(ctx, utils.IOStreams{
 			ErrOut: os.Stderr,
-		}, "kubectl", "apply", "-f", filepath.Join(conf.Workdir, runtime.PrometheusDeploy))
+		}, "apply", "-f", filepath.Join(conf.Workdir, runtime.PrometheusDeploy))
 		if err != nil {
 			return err
 		}
@@ -151,9 +151,9 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	kubeconfigBuf := bytes.NewBuffer(nil)
-	err = utils.Exec(ctx, "", utils.IOStreams{
+	err = c.Kubectl(ctx, utils.IOStreams{
 		Out: kubeconfigBuf,
-	}, "kubectl", "config", "view", "--minify=true", "--raw=true")
+	}, "config", "view", "--minify=true", "--raw=true")
 	if err != nil {
 		return err
 	}
@@ -164,8 +164,8 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	// set the context in default kubeconfig
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".cluster", "kind-"+conf.Name)
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".user", "kind-"+conf.Name)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "contexts."+conf.Name+".cluster", "kind-"+conf.Name)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "contexts."+conf.Name+".user", "kind-"+conf.Name)
 	return nil
 }
 
@@ -182,8 +182,8 @@ func (c *Cluster) Down(ctx context.Context) error {
 	}
 
 	// unset the context in default kubeconfig
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+conf.Name+".cluster")
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+conf.Name+".user")
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "contexts."+conf.Name+".cluster")
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "contexts."+conf.Name+".user")
 	return nil
 }
 

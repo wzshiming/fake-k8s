@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -114,10 +113,6 @@ func Exec(ctx context.Context, dir string, stm IOStreams, name string, arg ...st
 		return fmt.Errorf("%s %s: %w", name, strings.Join(arg, " "), err)
 	}
 	return nil
-}
-
-func LookPath(name string) (string, error) {
-	return exec.LookPath(name)
 }
 
 type IOStreams struct {
