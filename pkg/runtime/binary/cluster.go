@@ -375,13 +375,13 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	// set the context in default kubeconfig
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+conf.Name+".server", scheme+"://"+localAddress+":"+apiserverPortStr)
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".cluster", conf.Name)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "clusters."+conf.Name+".server", scheme+"://"+localAddress+":"+apiserverPortStr)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "contexts."+conf.Name+".cluster", conf.Name)
 	if conf.SecretPort {
-		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "clusters."+conf.Name+".insecure-skip-tls-verify", "true")
-		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "contexts."+conf.Name+".user", conf.Name)
-		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "users."+conf.Name+".client-certificate", adminCertPath)
-		utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "set", "users."+conf.Name+".client-key", adminKeyPath)
+		c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "clusters."+conf.Name+".insecure-skip-tls-verify", "true")
+		c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "contexts."+conf.Name+".user", conf.Name)
+		c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "users."+conf.Name+".client-certificate", adminCertPath)
+		c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "users."+conf.Name+".client-key", adminKeyPath)
 	}
 	return nil
 }
@@ -395,9 +395,9 @@ func (c *Cluster) Down(ctx context.Context) error {
 		return err
 	}
 
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "clusters."+conf.Name)
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "users."+conf.Name)
-	utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "config", "unset", "contexts."+conf.Name)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "clusters."+conf.Name)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "users."+conf.Name)
+	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "contexts."+conf.Name)
 
 	bin := filepath.Join(conf.Workdir, "bin")
 	kubeApiserverPath := filepath.Join(bin, "kube-apiserver")

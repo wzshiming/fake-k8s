@@ -61,7 +61,7 @@ func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 	}
 
 	logger.Printf("Loading resource %q on %q", flags.File, name)
-	err = load.Load(ctx, kubeconfig, flags.File)
+	err = load.Load(ctx, dc, kubeconfig, flags.File)
 	if err != nil {
 		return err
 	}

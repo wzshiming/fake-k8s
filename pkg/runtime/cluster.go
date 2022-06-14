@@ -3,9 +3,11 @@ package runtime
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/wzshiming/fake-k8s/pkg/utils"
+	"github.com/wzshiming/fake-k8s/pkg/vars"
 	"sigs.k8s.io/yaml"
 )
 
@@ -25,6 +27,7 @@ var (
 type Cluster struct {
 	workdir string
 	name    string
+	conf    *Config
 }
 
 func NewCluster(name, workdir string) *Cluster {
@@ -35,16 +38,20 @@ func NewCluster(name, workdir string) *Cluster {
 }
 
 func (c *Cluster) Config() (*Config, error) {
+	if c.conf != nil {
+		return c.conf, nil
+	}
 	config, err := os.ReadFile(filepath.Join(c.workdir, RawClusterConfigName))
 	if err != nil {
 		return nil, err
 	}
-	r := Config{}
-	err = yaml.Unmarshal(config, &r)
+	conf := Config{}
+	err = yaml.Unmarshal(config, &conf)
 	if err != nil {
 		return nil, err
 	}
-	return &r, nil
+	c.conf = &conf
+	return c.conf, nil
 }
 
 func (c *Cluster) InHostKubeconfig() (string, error) {
@@ -77,6 +84,21 @@ func (c *Cluster) Install(ctx context.Context, conf Config) error {
 	if err != nil {
 		return err
 	}
+
+	bin := filepath.Join(conf.Workdir, "bin")
+
+	_, err = exec.LookPath("kubectl")
+	if err != nil {
+		kubectlPath := filepath.Join(bin, "kubectl")
+		err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.KubectlBinary, kubectlPath, 0755, conf.QuietPull)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err != nil {
+		return err
+	}
 	err = os.WriteFile(filepath.Join(c.workdir, RawClusterConfigName), config, 0644)
 	if err != nil {
 		return err
@@ -100,9 +122,24 @@ func (c *Cluster) Ready(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "kubectl", "--kubeconfig", filepath.Join(conf.Workdir, InHostKubeconfigName), "get", "node")
+
+	err = c.Kubectl(ctx, utils.IOStreams{}, "--kubeconfig", filepath.Join(conf.Workdir, InHostKubeconfigName), "get", "node")
 	if err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func (c *Cluster) Kubectl(ctx context.Context, stm utils.IOStreams, args ...string) error {
+	conf, err := c.Config()
+	if err != nil {
+		return err
+	}
+
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		bin := filepath.Join(conf.Workdir, "bin")
+		kubectlPath = filepath.Join(bin, "kubectl")
+	}
+	return utils.Exec(ctx, "", stm, kubectlPath, args...)
 }

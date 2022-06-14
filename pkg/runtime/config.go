@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+
+	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
 
 type Config struct {
@@ -70,4 +72,7 @@ type Runtime interface {
 
 	// InHostKubeconfig return the kubeconfig in host
 	InHostKubeconfig() (string, error)
+
+	// Kubectl command
+	Kubectl(ctx context.Context, stm utils.IOStreams, args ...string) error
 }
