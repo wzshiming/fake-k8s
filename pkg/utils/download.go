@@ -68,17 +68,16 @@ func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.
 }
 
 func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet bool) (string, error) {
-	cache := filepath.Join(cacheDir, src)
-	if _, err := os.Stat(cache); err == nil {
-		return cache, nil
-	}
-
 	u, err := url.Parse(src)
 	if err != nil {
 		return "", err
 	}
 	switch u.Scheme {
 	case "http", "https":
+		cache := filepath.Join(cacheDir, u.Scheme, u.Path)
+		if _, err := os.Stat(cache); err == nil {
+			return cache, nil
+		}
 		cli := &http.Client{}
 		req, err := http.NewRequest("GET", u.String(), nil)
 		if err != nil {
@@ -137,10 +136,8 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet
 			return "", err
 		}
 		return cache, nil
-	case "file", "":
-		return u.Path, nil
 	default:
-		return "", fmt.Errorf("unknown scheme %v", u.Scheme)
+		return src, nil
 	}
 }
 
