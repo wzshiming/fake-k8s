@@ -34,7 +34,7 @@ func runE(logger cmd.Logger, flags *flagpole) error {
 	var images []string
 	var err error
 	switch flags.Runtime {
-	case "docker", "nertctl", "kind":
+	case "docker", "nerdctl", "kind":
 		logger.Printf("no binaries need to be installed for %s", flags.Runtime)
 		return nil
 	case "binary":

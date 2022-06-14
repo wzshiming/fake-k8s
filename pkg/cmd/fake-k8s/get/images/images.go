@@ -20,8 +20,8 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "images",
-		Short: "Lists images used by fake cluster, only for docker/nertctl/kind runtime",
-		Long:  "Lists images used by fake cluster, only for docker/nertctl/kind runtime",
+		Short: "Lists images used by fake cluster, only for docker/nerdctl/kind runtime",
+		Long:  "Lists images used by fake cluster, only for docker/nerdctl/kind runtime",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runE(logger, flags)
 		},
@@ -34,7 +34,7 @@ func runE(logger cmd.Logger, flags *flagpole) error {
 	var images []string
 	var err error
 	switch flags.Runtime {
-	case "docker", "nertctl":
+	case "docker", "nerdctl":
 		images, err = runtime.ListImagesCompose()
 	case "kind":
 		images, err = runtime.ListImagesKind()
