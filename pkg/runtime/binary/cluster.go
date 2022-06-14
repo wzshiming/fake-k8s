@@ -152,7 +152,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"--quota-backend-bytes",
 		"8589934592",
 	}
-	err = utils.ForkExec(conf.Workdir, etcdPath, etcdArgs...)
+	err = utils.ForkExec(ctx, conf.Workdir, etcdPath, etcdArgs...)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			filepath.Join(conf.Workdir, "cert"),
 		)
 	}
-	err = utils.ForkExec(conf.Workdir, kubeApiserverPath, kubeApiserverArgs...)
+	err = utils.ForkExec(ctx, conf.Workdir, kubeApiserverPath, kubeApiserverArgs...)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		)
 	}
 
-	err = utils.ForkExec(conf.Workdir, kubeControllerManagerPath, kubeControllerManagerArgs...)
+	err = utils.ForkExec(ctx, conf.Workdir, kubeControllerManagerPath, kubeControllerManagerArgs...)
 	if err != nil {
 		return err
 	}
@@ -297,7 +297,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			"0",
 		)
 	}
-	err = utils.ForkExec(conf.Workdir, kubeSchedulerPath, kubeSchedulerArgs...)
+	err = utils.ForkExec(ctx, conf.Workdir, kubeSchedulerPath, kubeSchedulerArgs...)
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			localAddress+":"+strconv.Itoa(fakeKubeletPort),
 		)
 	}
-	err = utils.ForkExec(conf.Workdir, fakeKubeletPath, fakeKubeletArgs...)
+	err = utils.ForkExec(ctx, conf.Workdir, fakeKubeletPath, fakeKubeletArgs...)
 	if err != nil {
 		return err
 	}
@@ -368,7 +368,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			"--web.listen-address",
 			serveAddress + ":" + prometheusPortStr,
 		}
-		err = utils.ForkExec(conf.Workdir, prometheusPath, prometheusArgs...)
+		err = utils.ForkExec(ctx, conf.Workdir, prometheusPath, prometheusArgs...)
 		if err != nil {
 			return err
 		}
@@ -407,33 +407,33 @@ func (c *Cluster) Down(ctx context.Context) error {
 	etcdPath := filepath.Join(bin, "etcd")
 	prometheusPath := filepath.Join(bin, "prometheus")
 
-	err = utils.ForkExecKill(conf.Workdir, fakeKubeletPath)
+	err = utils.ForkExecKill(ctx, conf.Workdir, fakeKubeletPath)
 	if err != nil {
 		return fmt.Errorf("failed to kill fake-kubelet: %w", err)
 	}
 
-	err = utils.ForkExecKill(conf.Workdir, kubeSchedulerPath)
+	err = utils.ForkExecKill(ctx, conf.Workdir, kubeSchedulerPath)
 	if err != nil {
 		return fmt.Errorf("failed to kill kube-scheduler: %w", err)
 	}
 
-	err = utils.ForkExecKill(conf.Workdir, kubeControllerManagerPath)
+	err = utils.ForkExecKill(ctx, conf.Workdir, kubeControllerManagerPath)
 	if err != nil {
 		return fmt.Errorf("failed to kill kube-controller-manager: %w", err)
 	}
 
-	err = utils.ForkExecKill(conf.Workdir, kubeApiserverPath)
+	err = utils.ForkExecKill(ctx, conf.Workdir, kubeApiserverPath)
 	if err != nil {
 		return fmt.Errorf("failed to kill kube-apiserver: %w", err)
 	}
 
-	err = utils.ForkExecKill(conf.Workdir, etcdPath)
+	err = utils.ForkExecKill(ctx, conf.Workdir, etcdPath)
 	if err != nil {
 		return fmt.Errorf("failed to kill etcd: %w", err)
 	}
 
 	if conf.PrometheusPort != 0 {
-		err = utils.ForkExecKill(conf.Workdir, prometheusPath)
+		err = utils.ForkExecKill(ctx, conf.Workdir, prometheusPath)
 		if err != nil {
 			return fmt.Errorf("failed to kill prometheus: %w", err)
 		}
@@ -451,7 +451,7 @@ func (c *Cluster) Start(ctx context.Context, name string) error {
 	bin := filepath.Join(conf.Workdir, "bin")
 	svc := filepath.Join(bin, name)
 
-	err = utils.ForkExecRestart(conf.Workdir, svc)
+	err = utils.ForkExecRestart(ctx, conf.Workdir, svc)
 	if err != nil {
 		return fmt.Errorf("failed to restart %s: %w", name, err)
 	}
@@ -467,7 +467,7 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 	bin := filepath.Join(conf.Workdir, "bin")
 	svc := filepath.Join(bin, name)
 
-	err = utils.ForkExecKill(conf.Workdir, svc)
+	err = utils.ForkExecKill(ctx, conf.Workdir, svc)
 	if err != nil {
 		return fmt.Errorf("failed to kill %s: %w", name, err)
 	}

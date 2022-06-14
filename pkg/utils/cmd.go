@@ -11,10 +11,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
-func ForkExec(dir string, name string, arg ...string) error {
+func ForkExec(ctx context.Context, dir string, name string, arg ...string) error {
 	pidPath := filepath.Join(dir, "pids", filepath.Base(name)+".pid")
 	pidData, err := os.ReadFile(pidPath)
 	if err == nil {
@@ -39,12 +38,8 @@ func ForkExec(dir string, name string, arg ...string) error {
 		return fmt.Errorf("write cmdline file %s: %w", cmdlinesPath, err)
 	}
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := commandStart(ctx, args[0], args[1:]...)
 	cmd.Dir = dir
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		// Setsid is used to detach the process from the parent (normally a shell)
-		Setsid: true,
-	}
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	err = cmd.Start()
@@ -59,7 +54,7 @@ func ForkExec(dir string, name string, arg ...string) error {
 	return nil
 }
 
-func ForkExecRestart(dir string, name string) error {
+func ForkExecRestart(ctx context.Context, dir string, name string) error {
 	cmdlinesPath := filepath.Join(dir, "cmdlines", filepath.Base(name))
 
 	data, err := os.ReadFile(cmdlinesPath)
@@ -69,10 +64,10 @@ func ForkExecRestart(dir string, name string) error {
 
 	args := strings.Split(string(data), " ")
 
-	return ForkExec(dir, args[0], args...)
+	return ForkExec(ctx, dir, args[0], args...)
 }
 
-func ForkExecKill(dir string, name string) error {
+func ForkExecKill(ctx context.Context, dir string, name string) error {
 	pidPath := filepath.Join(dir, "pids", filepath.Base(name)+".pid")
 	if _, err := os.Stat(pidPath); err != nil {
 		return nil
@@ -101,7 +96,7 @@ func ForkExecKill(dir string, name string) error {
 }
 
 func Exec(ctx context.Context, dir string, stm IOStreams, name string, arg ...string) error {
-	cmd := exec.CommandContext(ctx, name, arg...)
+	cmd := command(ctx, name, arg...)
 	cmd.Dir = dir
 	cmd.Stdin = stm.In
 	cmd.Stdout = stm.Out
