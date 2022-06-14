@@ -109,7 +109,7 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet
 		if !quiet {
 			message := filepath.Base(src)
 			pb := NewProgressBar(func(total, current int, elapsed time.Duration) string {
-				if total >= current {
+				if total <= current {
 					return "Download Complete " + message
 				}
 				return "Downloading " + message
