@@ -4,15 +4,15 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/create"
-	delete2 "github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/delete"
+	del "github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/delete"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/load"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 )
 
 // NewCommand returns a new cobra.Command for root
-func NewCommand(logger cmd.Logger) *cobra.Command {
+func NewCommand(logger log.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "fake-k8s [command]",
@@ -25,7 +25,7 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 
 	cmd.AddCommand(
 		create.NewCommand(logger),
-		delete2.NewCommand(logger),
+		del.NewCommand(logger),
 		get.NewCommand(logger),
 		load.NewCommand(logger),
 	)

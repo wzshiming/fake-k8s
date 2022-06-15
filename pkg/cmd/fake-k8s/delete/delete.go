@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/delete/cluster"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 )
 
 // NewCommand returns a new cobra.Command for cluster creation
-func NewCommand(logger cmd.Logger) *cobra.Command {
+func NewCommand(logger log.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "delete",

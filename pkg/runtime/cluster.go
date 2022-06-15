@@ -2,10 +2,12 @@ package runtime
 
 import (
 	"context"
-	"github.com/wzshiming/fake-k8s/pkg/utils"
-	"github.com/wzshiming/fake-k8s/pkg/vars"
 	"os"
 	"os/exec"
+
+	"github.com/wzshiming/fake-k8s/pkg/log"
+	"github.com/wzshiming/fake-k8s/pkg/utils"
+	"github.com/wzshiming/fake-k8s/pkg/vars"
 	"sigs.k8s.io/yaml"
 )
 
@@ -26,13 +28,19 @@ type Cluster struct {
 	workdir string
 	name    string
 	conf    *Config
+	logger  log.Logger
 }
 
-func NewCluster(name, workdir string) *Cluster {
+func NewCluster(name, workdir string, logger log.Logger) *Cluster {
 	return &Cluster{
 		name:    name,
 		workdir: workdir,
+		logger:  logger,
 	}
+}
+
+func (c *Cluster) Logger() log.Logger {
+	return c.logger
 }
 
 func (c *Cluster) Config() (*Config, error) {

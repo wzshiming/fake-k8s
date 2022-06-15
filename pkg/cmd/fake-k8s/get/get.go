@@ -4,15 +4,15 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/cmd"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/binaries"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/clusters"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/images"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get/kubeconfig"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 )
 
 // NewCommand returns a new cobra.Command for get
-func NewCommand(logger cmd.Logger) *cobra.Command {
+func NewCommand(logger log.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "get",
