@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/wzshiming/fake-k8s/pkg/pki"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
+	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
 type Cluster struct {
@@ -31,60 +31,60 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		return err
 	}
 
-	bin := filepath.Join(conf.Workdir, "bin")
+	bin := utils.PathJoin(conf.Workdir, "bin")
 
-	kubeApiserverPath := filepath.Join(bin, "kube-apiserver")
+	kubeApiserverPath := utils.PathJoin(bin, "kube-apiserver"+vars.BinSuffix)
 	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeApiserverBinary, kubeApiserverPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
-	kubeControllerManagerPath := filepath.Join(bin, "kube-controller-manager")
+	kubeControllerManagerPath := utils.PathJoin(bin, "kube-controller-manager"+vars.BinSuffix)
 	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeControllerManagerBinary, kubeControllerManagerPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
-	kubeSchedulerPath := filepath.Join(bin, "kube-scheduler")
+	kubeSchedulerPath := utils.PathJoin(bin, "kube-scheduler"+vars.BinSuffix)
 	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.KubeSchedulerBinary, kubeSchedulerPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
-	fakeKubeletPath := filepath.Join(bin, "fake-kubelet")
+	fakeKubeletPath := utils.PathJoin(bin, "fake-kubelet"+vars.BinSuffix)
 	err = utils.DownloadWithCache(ctx, conf.CacheDir, conf.FakeKubeletBinary, fakeKubeletPath, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
-	etcdPath := filepath.Join(bin, "etcd")
-	err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.EtcdBinaryTar, etcdPath, "etcd", 0755, conf.QuietPull)
+	etcdPath := utils.PathJoin(bin, "etcd"+vars.BinSuffix)
+	err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.EtcdBinaryTar, etcdPath, "etcd"+vars.BinSuffix, 0755, conf.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	if conf.PrometheusPort != 0 {
-		prometheusPath := filepath.Join(bin, "prometheus")
-		err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.PrometheusBinaryTar, prometheusPath, "prometheus", 0755, conf.QuietPull)
+		prometheusPath := utils.PathJoin(bin, "prometheus"+vars.BinSuffix)
+		err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.PrometheusBinaryTar, prometheusPath, "prometheus"+vars.BinSuffix, 0755, conf.QuietPull)
 		if err != nil {
 			return err
 		}
 	}
 
-	pids := filepath.Join(conf.Workdir, "pids")
+	pids := utils.PathJoin(conf.Workdir, "pids")
 	os.MkdirAll(pids, 0755)
 
-	logs := filepath.Join(conf.Workdir, "logs")
+	logs := utils.PathJoin(conf.Workdir, "logs")
 	os.MkdirAll(logs, 0755)
 
-	cmdlines := filepath.Join(conf.Workdir, "cmdlines")
+	cmdlines := utils.PathJoin(conf.Workdir, "cmdlines")
 	os.MkdirAll(cmdlines, 0755)
 
-	etcdDataPath := filepath.Join(conf.Workdir, runtime.EtcdDataDirName)
+	etcdDataPath := utils.PathJoin(conf.Workdir, runtime.EtcdDataDirName)
 	os.MkdirAll(etcdDataPath, 0755)
 
 	if conf.SecretPort {
-		pkiPath := filepath.Join(conf.Workdir, runtime.PkiName)
+		pkiPath := utils.PathJoin(conf.Workdir, runtime.PkiName)
 		os.MkdirAll(pkiPath, 0755)
 		err = pki.DumpPki(pkiPath)
 		if err != nil {
@@ -104,21 +104,21 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if conf.SecretPort {
 		scheme = "https"
 	}
-	bin := filepath.Join(conf.Workdir, "bin")
+	bin := utils.PathJoin(conf.Workdir, "bin")
 
 	localAddress := "127.0.0.1"
 	serveAddress := "0.0.0.0"
 
-	kubeApiserverPath := filepath.Join(bin, "kube-apiserver")
-	kubeControllerManagerPath := filepath.Join(bin, "kube-controller-manager")
-	kubeSchedulerPath := filepath.Join(bin, "kube-scheduler")
-	fakeKubeletPath := filepath.Join(bin, "fake-kubelet")
-	etcdPath := filepath.Join(bin, "etcd")
-	etcdDataPath := filepath.Join(conf.Workdir, runtime.EtcdDataDirName)
-	pkiPath := filepath.Join(conf.Workdir, runtime.PkiName)
-	caCertPath := filepath.Join(pkiPath, "ca.crt")
-	adminKeyPath := filepath.Join(pkiPath, "admin.key")
-	adminCertPath := filepath.Join(pkiPath, "admin.crt")
+	kubeApiserverPath := utils.PathJoin(bin, "kube-apiserver")
+	kubeControllerManagerPath := utils.PathJoin(bin, "kube-controller-manager")
+	kubeSchedulerPath := utils.PathJoin(bin, "kube-scheduler")
+	fakeKubeletPath := utils.PathJoin(bin, "fake-kubelet")
+	etcdPath := utils.PathJoin(bin, "etcd")
+	etcdDataPath := utils.PathJoin(conf.Workdir, runtime.EtcdDataDirName)
+	pkiPath := utils.PathJoin(conf.Workdir, runtime.PkiName)
+	caCertPath := utils.PathJoin(pkiPath, "ca.crt")
+	adminKeyPath := utils.PathJoin(pkiPath, "admin.key")
+	adminCertPath := utils.PathJoin(pkiPath, "admin.crt")
 
 	etcdPeerPort, err := utils.GetUnusedPort()
 	if err != nil {
@@ -200,7 +200,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			"--insecure-port",
 			apiserverPortStr,
 			"--cert-dir",
-			filepath.Join(conf.Workdir, "cert"),
+			utils.PathJoin(conf.Workdir, "cert"),
 		)
 	}
 	err = utils.ForkExec(ctx, conf.Workdir, kubeApiserverPath, kubeApiserverArgs...)
@@ -219,7 +219,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		return err
 	}
 
-	kubeconfigPath := filepath.Join(conf.Workdir, runtime.InHostKubeconfigName)
+	kubeconfigPath := utils.PathJoin(conf.Workdir, runtime.InHostKubeconfigName)
 	err = os.WriteFile(kubeconfigPath, []byte(kubeconfigData), 0644)
 	if err != nil {
 		return err
@@ -302,7 +302,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 		return err
 	}
 
-	nodeTplPath := filepath.Join(conf.Workdir, "node.tpl")
+	nodeTplPath := utils.PathJoin(conf.Workdir, "node.tpl")
 	err = os.WriteFile(nodeTplPath, nodeTpl, 0644)
 	if err != nil {
 		return err
@@ -355,13 +355,13 @@ func (c *Cluster) Up(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate prometheus yaml: %s", err)
 		}
-		prometheusConfigPath := filepath.Join(conf.Workdir, runtime.Prometheus)
+		prometheusConfigPath := utils.PathJoin(conf.Workdir, runtime.Prometheus)
 		err = os.WriteFile(prometheusConfigPath, []byte(prometheusData), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write prometheus yaml: %s", err)
 		}
 
-		prometheusPath := filepath.Join(bin, "prometheus")
+		prometheusPath := utils.PathJoin(bin, "prometheus")
 		prometheusArgs := []string{
 			"--config.file",
 			prometheusConfigPath,
@@ -399,13 +399,13 @@ func (c *Cluster) Down(ctx context.Context) error {
 	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "users."+conf.Name)
 	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "contexts."+conf.Name)
 
-	bin := filepath.Join(conf.Workdir, "bin")
-	kubeApiserverPath := filepath.Join(bin, "kube-apiserver")
-	kubeControllerManagerPath := filepath.Join(bin, "kube-controller-manager")
-	kubeSchedulerPath := filepath.Join(bin, "kube-scheduler")
-	fakeKubeletPath := filepath.Join(bin, "fake-kubelet")
-	etcdPath := filepath.Join(bin, "etcd")
-	prometheusPath := filepath.Join(bin, "prometheus")
+	bin := utils.PathJoin(conf.Workdir, "bin")
+	kubeApiserverPath := utils.PathJoin(bin, "kube-apiserver")
+	kubeControllerManagerPath := utils.PathJoin(bin, "kube-controller-manager")
+	kubeSchedulerPath := utils.PathJoin(bin, "kube-scheduler")
+	fakeKubeletPath := utils.PathJoin(bin, "fake-kubelet")
+	etcdPath := utils.PathJoin(bin, "etcd")
+	prometheusPath := utils.PathJoin(bin, "prometheus")
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, fakeKubeletPath)
 	if err != nil {
@@ -448,8 +448,8 @@ func (c *Cluster) Start(ctx context.Context, name string) error {
 		return err
 	}
 
-	bin := filepath.Join(conf.Workdir, "bin")
-	svc := filepath.Join(bin, name)
+	bin := utils.PathJoin(conf.Workdir, "bin")
+	svc := utils.PathJoin(bin, name)
 
 	err = utils.ForkExecRestart(ctx, conf.Workdir, svc)
 	if err != nil {
@@ -464,8 +464,8 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 		return err
 	}
 
-	bin := filepath.Join(conf.Workdir, "bin")
-	svc := filepath.Join(bin, name)
+	bin := utils.PathJoin(conf.Workdir, "bin")
+	svc := utils.PathJoin(bin, name)
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, svc)
 	if err != nil {

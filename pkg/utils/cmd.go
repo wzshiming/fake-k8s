@@ -13,7 +13,7 @@ import (
 )
 
 func ForkExec(ctx context.Context, dir string, name string, arg ...string) error {
-	pidPath := filepath.Join(dir, "pids", filepath.Base(name)+".pid")
+	pidPath := PathJoin(dir, "pids", filepath.Base(name)+".pid")
 	pidData, err := os.ReadFile(pidPath)
 	if err == nil {
 		_, err = strconv.Atoi(string(pidData))
@@ -22,8 +22,8 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 		}
 	}
 
-	logPath := filepath.Join(dir, "logs", filepath.Base(name)+".log")
-	cmdlinesPath := filepath.Join(dir, "cmdlines", filepath.Base(name))
+	logPath := PathJoin(dir, "logs", filepath.Base(name)+".log")
+	cmdlinesPath := PathJoin(dir, "cmdlines", filepath.Base(name))
 
 	logFile, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
@@ -37,7 +37,7 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 		return fmt.Errorf("write cmdline file %s: %w", cmdlinesPath, err)
 	}
 
-	cmd := commandStart(ctx, args[0], args[1:]...)
+	cmd := startProcess(ctx, args[0], args[1:]...)
 	cmd.Dir = dir
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
@@ -54,7 +54,7 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 }
 
 func ForkExecRestart(ctx context.Context, dir string, name string) error {
-	cmdlinesPath := filepath.Join(dir, "cmdlines", filepath.Base(name))
+	cmdlinesPath := PathJoin(dir, "cmdlines", filepath.Base(name))
 
 	data, err := os.ReadFile(cmdlinesPath)
 	if err != nil {
@@ -67,7 +67,7 @@ func ForkExecRestart(ctx context.Context, dir string, name string) error {
 }
 
 func ForkExecKill(ctx context.Context, dir string, name string) error {
-	pidPath := filepath.Join(dir, "pids", filepath.Base(name)+".pid")
+	pidPath := PathJoin(dir, "pids", filepath.Base(name)+".pid")
 	if _, err := os.Stat(pidPath); err != nil {
 		return nil
 	}
@@ -79,18 +79,14 @@ func ForkExecKill(ctx context.Context, dir string, name string) error {
 	if err != nil {
 		return fmt.Errorf("parse pid file %s: %w", pidPath, err)
 	}
-	process, err := os.FindProcess(pid)
+	err = killProcess(ctx, pid)
 	if err != nil {
-		return fmt.Errorf("find process %d: %w", pid, err)
+		return err
 	}
-	err = process.Kill()
+	err = os.Remove(pidPath)
 	if err != nil {
-		if errors.Is(err, os.ErrProcessDone) {
-			return nil
-		}
-		return fmt.Errorf("kill process: %w", err)
+		return err
 	}
-	process.Wait()
 	return nil
 }
 
@@ -122,4 +118,20 @@ type IOStreams struct {
 	Out io.Writer
 	// ErrOut think, os.Stderr
 	ErrOut io.Writer
+}
+
+func killProcess(ctx context.Context, pid int) error {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("find process %d: %w", pid, err)
+	}
+	err = process.Kill()
+	if err != nil {
+		if errors.Is(err, os.ErrProcessDone) {
+			return nil
+		}
+		return fmt.Errorf("kill process: %w", err)
+	}
+	process.Wait()
+	return nil
 }

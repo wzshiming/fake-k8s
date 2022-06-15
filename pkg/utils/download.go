@@ -22,7 +22,7 @@ func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string
 	if err != nil {
 		return err
 	}
-	cache := filepath.Join(filepath.Dir(cacheTar), match)
+	cache := PathJoin(filepath.Dir(cacheTar), match)
 	if _, err := os.Stat(cache); err != nil {
 		err = Untar(cacheTar, func(file string) (string, bool) {
 			if filepath.Base(file) == match {
@@ -74,7 +74,7 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet
 	}
 	switch u.Scheme {
 	case "http", "https":
-		cache := filepath.Join(cacheDir, u.Scheme, u.Path)
+		cache := PathJoin(cacheDir, u.Scheme, u.Path)
 		if _, err := os.Stat(cache); err == nil {
 			return cache, nil
 		}
