@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/cmd"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/resource/load"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
@@ -17,7 +17,7 @@ type flagpole struct {
 }
 
 // NewCommand returns a new cobra.Command for cluster creation
-func NewCommand(logger cmd.Logger) *cobra.Command {
+func NewCommand(logger log.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
@@ -33,17 +33,17 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 	return cmd
 }
 
-func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
+func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 	controllerName := "kube-controller-manager"
 	name := vars.ProjectName + "-" + flags.Name
 	workdir := utils.PathJoin(vars.TempDir, flags.Name)
 
-	dc, err := runtime.Load(name, workdir)
+	dc, err := runtime.Load(name, workdir, logger)
 	if err != nil {
 		return err
 	}
 
-	logger.Printf("Stoping controller %q on %q", controllerName, name)
+	logger.Printf("Stopping controller %q on %q", controllerName, name)
 	err = dc.Stop(ctx, controllerName)
 	if err != nil {
 		return err
@@ -60,7 +60,11 @@ func runE(ctx context.Context, logger cmd.Logger, flags *flagpole) error {
 		return err
 	}
 
-	logger.Printf("Loading resource %q on %q", flags.File, name)
+	file := flags.File
+	if file == "-" {
+		file = "STDIN"
+	}
+	logger.Printf("Loading resource %q on %q", file, name)
 	err = load.Load(ctx, dc, kubeconfig, flags.File)
 	if err != nil {
 		return err

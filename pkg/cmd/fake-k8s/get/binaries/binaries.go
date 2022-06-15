@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/cmd"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
@@ -15,7 +15,7 @@ type flagpole struct {
 }
 
 // NewCommand returns a new cobra.Command for getting the list of clusters
-func NewCommand(logger cmd.Logger) *cobra.Command {
+func NewCommand(logger log.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
@@ -30,7 +30,7 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 	return cmd
 }
 
-func runE(logger cmd.Logger, flags *flagpole) error {
+func runE(logger log.Logger, flags *flagpole) error {
 	var images []string
 	var err error
 	switch flags.Runtime {

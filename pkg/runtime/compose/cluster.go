@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/pki"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
@@ -16,9 +17,9 @@ type Cluster struct {
 	*runtime.Cluster
 }
 
-func NewCluster(name, workdir string) (runtime.Runtime, error) {
+func NewCluster(name, workdir string, logger log.Logger) (runtime.Runtime, error) {
 	return &Cluster{
-		Cluster: runtime.NewCluster(name, workdir),
+		Cluster: runtime.NewCluster(name, workdir, logger),
 	}, nil
 }
 
@@ -218,7 +219,7 @@ func (c *Cluster) Down(ctx context.Context) error {
 		ErrOut: os.Stderr,
 	}, conf.Runtime, args...)
 	if err != nil {
-		return err
+		c.Logger().Printf("Failed to down cluster: %v", err)
 	}
 	return nil
 }

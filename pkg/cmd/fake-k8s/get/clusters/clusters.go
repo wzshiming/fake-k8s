@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/wzshiming/fake-k8s/pkg/cmd"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
 
 // NewCommand returns a new cobra.Command for getting the list of clusters
-func NewCommand(logger cmd.Logger) *cobra.Command {
+func NewCommand(logger log.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "clusters",
@@ -23,7 +23,7 @@ func NewCommand(logger cmd.Logger) *cobra.Command {
 	return cmd
 }
 
-func runE(logger cmd.Logger) error {
+func runE(logger log.Logger) error {
 	clusters, err := runtime.ListClusters(vars.TempDir)
 	if err != nil {
 		return err

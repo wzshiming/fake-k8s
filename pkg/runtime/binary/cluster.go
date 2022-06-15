@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/pki"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
@@ -19,9 +20,9 @@ type Cluster struct {
 	*runtime.Cluster
 }
 
-func NewCluster(name, workdir string) (runtime.Runtime, error) {
+func NewCluster(name, workdir string, logger log.Logger) (runtime.Runtime, error) {
 	return &Cluster{
-		Cluster: runtime.NewCluster(name, workdir),
+		Cluster: runtime.NewCluster(name, workdir, logger),
 	}, nil
 }
 
@@ -409,33 +410,33 @@ func (c *Cluster) Down(ctx context.Context) error {
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, fakeKubeletPath)
 	if err != nil {
-		return fmt.Errorf("failed to kill fake-kubelet: %w", err)
+		c.Logger().Printf("failed to kill fake-kubelet: %s", err)
 	}
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, kubeSchedulerPath)
 	if err != nil {
-		return fmt.Errorf("failed to kill kube-scheduler: %w", err)
+		c.Logger().Printf("failed to kill kube-scheduler: %s", err)
 	}
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, kubeControllerManagerPath)
 	if err != nil {
-		return fmt.Errorf("failed to kill kube-controller-manager: %w", err)
+		c.Logger().Printf("failed to kill kube-controller-manager: %s", err)
 	}
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, kubeApiserverPath)
 	if err != nil {
-		return fmt.Errorf("failed to kill kube-apiserver: %w", err)
+		c.Logger().Printf("failed to kill kube-apiserver: %s", err)
 	}
 
 	err = utils.ForkExecKill(ctx, conf.Workdir, etcdPath)
 	if err != nil {
-		return fmt.Errorf("failed to kill etcd: %w", err)
+		c.Logger().Printf("failed to kill etcd: %s", err)
 	}
 
 	if conf.PrometheusPort != 0 {
 		err = utils.ForkExecKill(ctx, conf.Workdir, prometheusPath)
 		if err != nil {
-			return fmt.Errorf("failed to kill prometheus: %w", err)
+			c.Logger().Printf("failed to kill prometheus: %s", err)
 		}
 	}
 

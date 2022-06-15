@@ -5,18 +5,20 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"os"
+
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
-	"os"
 )
 
 type Cluster struct {
 	*runtime.Cluster
 }
 
-func NewCluster(name, workdir string) (runtime.Runtime, error) {
+func NewCluster(name, workdir string, logger log.Logger) (runtime.Runtime, error) {
 	return &Cluster{
-		Cluster: runtime.NewCluster(name, workdir),
+		Cluster: runtime.NewCluster(name, workdir, logger),
 	}, nil
 }
 
@@ -172,16 +174,18 @@ func (c *Cluster) Down(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = utils.Exec(ctx, "", utils.IOStreams{
-		ErrOut: os.Stderr,
-	}, conf.Runtime, "delete", "cluster", "--name", conf.Name)
-	if err != nil {
-		return err
-	}
 
 	// unset the context in default kubeconfig
 	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "contexts."+conf.Name+".cluster")
 	c.Kubectl(ctx, utils.IOStreams{}, "config", "unset", "contexts."+conf.Name+".user")
+
+	err = utils.Exec(ctx, "", utils.IOStreams{
+		ErrOut: os.Stderr,
+	}, conf.Runtime, "delete", "cluster", "--name", conf.Name)
+	if err != nil {
+		c.Logger().Printf("failed to delete cluster: %v", err)
+	}
+
 	return nil
 }
 

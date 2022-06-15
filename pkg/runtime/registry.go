@@ -3,10 +3,11 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"github.com/wzshiming/fake-k8s/pkg/log"
 	"sort"
 )
 
-type NewRuntime func(name, workdir string) (Runtime, error)
+type NewRuntime func(name, workdir string, logger log.Logger) (Runtime, error)
 
 var registry = map[string]NewRuntime{}
 
@@ -25,8 +26,8 @@ func Get(name string) (rt NewRuntime, ok bool) {
 	return nil, false
 }
 
-func Load(name, workdir string) (Runtime, error) {
-	dc := NewCluster(name, workdir)
+func Load(name, workdir string, logger log.Logger) (Runtime, error) {
+	dc := NewCluster(name, workdir, logger)
 	conf, err := dc.Load(context.Background())
 	if err != nil {
 		return nil, err
@@ -35,7 +36,7 @@ func Load(name, workdir string) (Runtime, error) {
 	if !ok {
 		return nil, fmt.Errorf("not found runtime %q", conf.Runtime)
 	}
-	return nr(name, workdir)
+	return nr(name, workdir, logger)
 }
 
 // List all registered runtime
