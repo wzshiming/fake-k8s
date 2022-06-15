@@ -1,0 +1,97 @@
+name: Test Darwin
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:
+
+jobs:
+  build-k8s:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: kubernetes/kubernetes
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Build k8s
+        run: |
+          go build -o kube-apiserver ./cmd/kube-apiserver
+          go build -o kube-controller-manager ./cmd/kube-controller-manager
+          go build -o kube-scheduler ./cmd/kube-scheduler
+          go build -o kubectl ./cmd/kubectl
+      - name: Upload fake-k8s
+        uses: actions/upload-artifact@v2
+        with:
+          name: binary
+          path: |
+            kube-apiserver
+            kube-controller-manager
+            kube-scheduler
+            kubectl
+
+  build-fake-k8s:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: wzshiming/fake-k8s
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Build fake-k8s
+        run: |
+          go build -o fake-k8s ./cmd/fake-k8s
+      - name: Upload fake-k8s
+        uses: actions/upload-artifact@v2
+        with:
+          name: binary
+          path: fake-k8s
+
+  e2e-test-binary:
+    runs-on: macos-latest
+    needs:
+      - build-fake-k8s
+      - build-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run test
+        run: |
+          chmod +x fake-k8s
+          chmod +x kube-apiserver
+          chmod +x kube-controller-manager
+          chmod +x kube-scheduler
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+          KUBE_BINARY_PREFIX=$(pwd) RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 1)
+
+  e2e-mock-test-binary:
+    runs-on: macos-latest
+    needs:
+      - build-fake-k8s
+      - build-k8s
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download for binary
+        uses: actions/download-artifact@v2
+        with:
+          name: binary
+      - name: Run test
+        run: |
+          chmod +x fake-k8s
+          chmod +x kube-apiserver
+          chmod +x kube-controller-manager
+          chmod +x kube-scheduler
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/
+          KUBE_BINARY_PREFIX=$(pwd) RUNTIME=binary ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)
