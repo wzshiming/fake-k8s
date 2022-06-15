@@ -42,7 +42,10 @@ func Unzip(src string, filter func(file string) (string, bool)) error {
 				return nil
 			}
 
-			os.MkdirAll(filepath.Dir(name), 0755)
+			err = os.MkdirAll(filepath.Dir(name), 0755)
+			if err != nil {
+				return err
+			}
 
 			rc, err := f.Open()
 			if err != nil {
@@ -103,8 +106,10 @@ func Untargz(src string, filter func(file string) (string, bool)) error {
 				return nil
 			}
 
-			os.MkdirAll(filepath.Dir(name), 0755)
-
+			err = os.MkdirAll(filepath.Dir(name), 0755)
+			if err != nil {
+				return err
+			}
 			outFile, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fs.FileMode(hdr.Mode))
 			if err != nil {
 				return err

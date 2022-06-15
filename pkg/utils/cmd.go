@@ -25,6 +25,19 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 	logPath := PathJoin(dir, "logs", filepath.Base(name)+".log")
 	cmdlinesPath := PathJoin(dir, "cmdlines", filepath.Base(name))
 
+	err = os.MkdirAll(filepath.Dir(pidPath), 0755)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(filepath.Dir(logPath), 0755)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(filepath.Dir(cmdlinesPath), 0755)
+	if err != nil {
+		return err
+	}
+
 	logFile, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("open log file %s: %w", logPath, err)

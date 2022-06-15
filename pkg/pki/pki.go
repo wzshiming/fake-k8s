@@ -26,7 +26,11 @@ var (
 
 // DumpPki generates a pki directory.
 func DumpPki(dir string) error {
-	err := os.WriteFile(utils.PathJoin(dir, "ca.crt"), CACrt, 0644)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(utils.PathJoin(dir, "ca.crt"), CACrt, 0644)
 	if err != nil {
 		return err
 	}
