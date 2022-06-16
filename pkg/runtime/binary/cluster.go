@@ -72,21 +72,11 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		}
 	}
 
-	pids := utils.PathJoin(conf.Workdir, "pids")
-	os.MkdirAll(pids, 0755)
-
-	logs := utils.PathJoin(conf.Workdir, "logs")
-	os.MkdirAll(logs, 0755)
-
-	cmdlines := utils.PathJoin(conf.Workdir, "cmdlines")
-	os.MkdirAll(cmdlines, 0755)
-
 	etcdDataPath := utils.PathJoin(conf.Workdir, runtime.EtcdDataDirName)
 	os.MkdirAll(etcdDataPath, 0755)
 
 	if conf.SecretPort {
 		pkiPath := utils.PathJoin(conf.Workdir, runtime.PkiName)
-		os.MkdirAll(pkiPath, 0755)
 		err = pki.DumpPki(pkiPath)
 		if err != nil {
 			return fmt.Errorf("failed to generate pki: %s", err)
