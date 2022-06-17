@@ -7,12 +7,20 @@ fake-k8s is a tool for running Fake Kubernetes clusters
 
 [The old version](https://github.com/wzshiming/fake-k8s/blob/v0.1.1/fake-k8s.sh) uses shell implementation and is no longer maintained
 
-## Requirements
-
-- Docker or Nerdctl or Kind or Binary
-- Kubectl
-
 ## Usage
+
+### Support runtime
+
+- Binary (the default of Linux)  
+  Download and start the fake cluster using the binaries,  
+  Since Kubernetes officially only provides binaries for Linux, it is only the default for Linux.  
+  For other than Linux you will need to compile Kubernetes binaries yourself.  
+- Docker (compose v2) (the default of other than Linux)  
+  Start the fake cluster using the container.  
+- Nerdctl  
+  ditto.  
+- Kind  
+  Start the fake cluster using the kind container.  
 
 ### Cteate cluster
 
