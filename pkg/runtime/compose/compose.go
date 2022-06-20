@@ -52,4 +52,7 @@ type BuildComposeConfig struct {
 	NodeName         string
 	GenerateNodeName string
 	GenerateReplicas uint32
+
+	RuntimeConfig string
+	FeatureGates  string
 }

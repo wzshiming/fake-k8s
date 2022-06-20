@@ -144,6 +144,12 @@ var (
 		}
 		return ""
 	}()
+
+	// FeatureGates is a set of key=value pairs that describe feature gates for alpha/experimental features of Kubernetes.
+	FeatureGates = getEnv("FEATURE_GATES", k8s.GetFeatureGates(parseRelease(KubeVersion)))
+
+	// RuntimeConfig is a set of key=value pairs that enable or disable built-in APIs.
+	RuntimeConfig = getEnv("RUNTIME_CONFIG", k8s.GetRuntimeConfig(parseRelease(KubeVersion)))
 )
 
 // getEnv returns the value of the environment variable named by the key.

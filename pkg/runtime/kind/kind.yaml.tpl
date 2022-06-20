@@ -14,3 +14,17 @@ ${{ if .PrometheusPort }}
         listenAddress: "0.0.0.0"
         protocol: TCP
 ${{ end }}
+
+${{ if .FeatureGates }}
+featureGates:
+${{ range .FeatureGates }}
+  ${{ . }}
+${{ end }}
+${{ end }}
+
+${{ if .RuntimeConfig }}
+runtimeConfig:
+${{ range .RuntimeConfig }}
+  ${{ . }}
+${{ end }}
+${{ end }}

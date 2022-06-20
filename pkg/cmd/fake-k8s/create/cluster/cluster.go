@@ -36,6 +36,8 @@ type flagpole struct {
 	GenerateNodeName            string
 	NodeName                    []string
 	Runtime                     string
+	FeatureGates                string
+	RuntimeConfig               string
 }
 
 // NewCommand returns a new cobra.Command for cluster creation
@@ -94,6 +96,8 @@ func NewCommand(logger log.Logger) *cobra.Command {
 	cmd.Flags().StringVar(&flags.GenerateNodeName, "generate-node-name", vars.GenerateNodeName, `node name of the fake node`)
 	cmd.Flags().StringArrayVar(&flags.NodeName, "node-name", vars.NodeName, `node name of the fake node`)
 	cmd.Flags().StringVar(&flags.Runtime, "runtime", vars.Runtime, "runtime of the fake cluster ("+strings.Join(runtime.List(), " or ")+")")
+	cmd.Flags().StringVar(&flags.FeatureGates, "feature-gates", vars.FeatureGates, "a set of key=value pairs that describe feature gates for alpha/experimental features of Kubernetes")
+	cmd.Flags().StringVar(&flags.RuntimeConfig, "runtime-config", vars.RuntimeConfig, "a set of key=value pairs that enable or disable built-in APIs")
 	return cmd
 }
 
@@ -141,6 +145,8 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 		GenerateNodeName:            flags.GenerateNodeName,
 		GenerateReplicas:            flags.GenerateReplicas,
 		NodeName:                    strings.Join(flags.NodeName, ","),
+		FeatureGates:                flags.FeatureGates,
+		RuntimeConfig:               flags.RuntimeConfig,
 	})
 	if err != nil {
 		return fmt.Errorf("failed install %q cluster: %w", name, err)
