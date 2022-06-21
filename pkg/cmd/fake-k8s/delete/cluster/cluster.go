@@ -12,21 +12,49 @@ import (
 
 type flagpole struct {
 	Name string
+	All  bool
 }
 
 // NewCommand returns a new cobra.Command for cluster creation
 func NewCommand(logger log.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
-		Args:  cobra.NoArgs,
-		Use:   "cluster",
+		Use:   "cluster [name ...]",
 		Short: "Deletes a cluster",
 		Long:  "Deletes a cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			flags.Name = vars.DefaultCluster
+			if flags.All {
+				list, err := runtime.ListClusters(vars.TempDir)
+				if err != nil {
+					return err
+				}
+				for _, name := range list {
+					flags.Name = name
+					err = runE(cmd.Context(), logger, flags)
+					if err != nil {
+						logger.Printf("Error deleting cluster %q: %v", name, err)
+					}
+				}
+				return nil
+			}
+			if len(args) == 0 {
+				flags.Name = vars.DefaultCluster
+			} else if len(args) == 1 {
+				flags.Name = args[0]
+			} else {
+				for _, name := range args {
+					flags.Name = name
+					err := runE(cmd.Context(), logger, flags)
+					if err != nil {
+						logger.Printf("Error deleting cluster %q: %v", name, err)
+					}
+				}
+				return nil
+			}
 			return runE(cmd.Context(), logger, flags)
 		},
 	}
+	cmd.Flags().BoolVar(&flags.All, "all", false, "Delete all clusters")
 	return cmd
 }
 
