@@ -124,12 +124,7 @@ func (c *Cluster) Uninstall(ctx context.Context) error {
 }
 
 func (c *Cluster) Ready(ctx context.Context) (bool, error) {
-	conf, err := c.Config()
-	if err != nil {
-		return false, err
-	}
-
-	err = c.Kubectl(ctx, utils.IOStreams{}, "--kubeconfig", utils.PathJoin(conf.Workdir, InHostKubeconfigName), "get", "node")
+	err := c.KubectlInCluster(ctx, utils.IOStreams{}, "get", "node")
 	if err != nil {
 		return false, err
 	}

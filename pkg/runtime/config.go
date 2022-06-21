@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"io"
 
 	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
@@ -84,4 +85,10 @@ type Runtime interface {
 
 	// KubectlInCluster command in cluster
 	KubectlInCluster(ctx context.Context, stm utils.IOStreams, args ...string) error
+
+	// Logs logs of a component
+	Logs(ctx context.Context, name string, out io.Writer) error
+
+	// LogsFollow follow logs of a component with follow
+	LogsFollow(ctx context.Context, name string, out io.Writer) error
 }

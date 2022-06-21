@@ -3,8 +3,10 @@ package compose
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
 	"github.com/wzshiming/fake-k8s/pkg/log"
@@ -204,6 +206,17 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	for i := 0; ; i++ {
+		ready, err := c.Ready(ctx)
+		if ready {
+			break
+		}
+		time.Sleep(time.Second)
+		if i > 30 {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -244,4 +257,32 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Cluster) logs(ctx context.Context, name string, out io.Writer, follow bool) error {
+	conf, err := c.Config()
+	if err != nil {
+		return err
+	}
+	args := []string{"logs"}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, conf.Name+"-"+name)
+	err = utils.Exec(ctx, conf.Workdir, utils.IOStreams{
+		ErrOut: out,
+		Out:    out,
+	}, conf.Runtime, args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) Logs(ctx context.Context, name string, out io.Writer) error {
+	return c.logs(ctx, name, out, false)
+}
+
+func (c *Cluster) LogsFollow(ctx context.Context, name string, out io.Writer) error {
+	return c.logs(ctx, name, out, true)
 }

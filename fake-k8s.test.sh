@@ -51,6 +51,8 @@ EOF
   if ! ./fake-k8s --name="${name}" kubectl get pod | grep Running >/dev/null 2>&1; then
     echo "=== release ${release} is not works ==="
     failed+=("${release}_not_works")
+
+    ./fake-k8s --name="${name}" logs kube-apiserver
   fi
 
   for ((i = 0; i < 30; i++)); do
