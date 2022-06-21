@@ -32,12 +32,25 @@ func NewCommand(logger log.Logger) *cobra.Command {
 }
 
 func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
-	kubeconfigPath := utils.PathJoin(vars.TempDir, flags.Name, runtime.InHostKubeconfigName)
+	name := vars.ProjectName + "-" + flags.Name
+	workdir := utils.PathJoin(vars.TempDir, flags.Name)
 
-	data, err := os.ReadFile(kubeconfigPath)
+	dc, err := runtime.Load(name, workdir, logger)
 	if err != nil {
 		return err
 	}
-	os.Stdout.Write(data)
+
+	kubeconfigPath, err := dc.InHostKubeconfig()
+	if err != nil {
+		return err
+	}
+	err = dc.Kubectl(ctx, utils.IOStreams{
+		Out:    os.Stdout,
+		ErrOut: os.Stderr,
+	}, "--kubeconfig", kubeconfigPath, "config", "view", "--minify", "--flatten", "--raw")
+
+	if err != nil {
+		return err
+	}
 	return nil
 }
