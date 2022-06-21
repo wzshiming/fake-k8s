@@ -16,7 +16,7 @@ function test_release() {
   KUBE_VERSION="${release}" ./fake-k8s create cluster --name "${name}" --quiet-pull --prometheus-port 9090
 
   for ((i = 0; i < 30; i++)); do
-    kubectl --context="fake-k8s-${name}" apply -f - <<EOF
+    ./fake-k8s --name "${name}" kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,19 +36,19 @@ spec:
         - name: fake-pod
           image: fake
 EOF
-    if kubectl --context="fake-k8s-${name}" get pod 2>/dev/null | grep Running >/dev/null 2>&1; then
+    if ./fake-k8s --name="${name}" kubectl get pod 2>/dev/null | grep Running >/dev/null 2>&1; then
       break
     fi
     sleep 1
   done
 
   echo kubectl --context="fake-k8s-${name}" config view --minify
-  kubectl --context="fake-k8s-${name}" config view --minify
+  ./fake-k8s --name="${name}" kubectl config view --minify
 
   echo kubectl --context="fake-k8s-${name}" get pod
-  kubectl --context="fake-k8s-${name}" get pod
+  ./fake-k8s --name="${name}" kubectl get pod
 
-  if ! kubectl --context="fake-k8s-${name}" get pod | grep Running >/dev/null 2>&1; then
+  if ! ./fake-k8s --name="${name}" kubectl get pod | grep Running >/dev/null 2>&1; then
     echo "=== release ${release} is not works ==="
     failed+=("${release}_not_works")
   fi

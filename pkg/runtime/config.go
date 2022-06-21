@@ -75,4 +75,7 @@ type Runtime interface {
 
 	// Kubectl command
 	Kubectl(ctx context.Context, stm utils.IOStreams, args ...string) error
+
+	// KubectlInCluster command in cluster
+	KubectlInCluster(ctx context.Context, stm utils.IOStreams, args ...string) error
 }

@@ -47,10 +47,10 @@ func NewCommand(logger log.Logger) *cobra.Command {
 		Short: "Creates a fake Kubernetes cluster",
 		Long:  "Creates a fake Kubernetes cluster using container",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			flags.Name = vars.DefaultCluster
 			return runE(cmd.Context(), logger, flags)
 		},
 	}
-	cmd.Flags().StringVar(&flags.Name, "name", "default", `cluster name`)
 	cmd.Flags().Uint32Var(&flags.PrometheusPort, "prometheus-port", uint32(vars.PrometheusPort), `port to expose Prometheus metrics`)
 	cmd.Flags().BoolVar(&flags.SecurePort, "secure-port", vars.SecurePort, `apiserver use TLS`)
 	cmd.Flags().BoolVar(&flags.QuietPull, "quiet-pull", vars.QuietPull, `pull without printing progress information`)

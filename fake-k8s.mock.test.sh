@@ -5,7 +5,7 @@ kube_version="$1"
 
 KUBE_VERSION="${kube_version}" ./fake-k8s create cluster --quiet-pull --generate-replicas 1
 sleep 10
-kubectl --context=fake-k8s-default create -f - <<EOF
+./fake-k8s kubectl create -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,8 +27,8 @@ spec:
 EOF
 sleep 10
 
-kubectl --context=fake-k8s-default get "${resource}" -n default -o yaml > tmp.yaml
-old_fake_k8s_content="$(kubectl --context=fake-k8s-default get "${resource}" -n default -o name)"
+./fake-k8s kubectl get "${resource}" -n default -o yaml > tmp.yaml
+old_fake_k8s_content="$(./fake-k8s kubectl get "${resource}" -n default -o name)"
 ./fake-k8s delete cluster
 
 
@@ -37,7 +37,7 @@ sleep 10
 cat tmp.yaml | ./fake-k8s load resource -f -
 sleep 10
 
-fake_k8s_content="$(kubectl --context=fake-k8s-default get "${resource}" -n default -o name)"
+fake_k8s_content="$(./fake-k8s kubectl get "${resource}" -n default -o name)"
 
 ./fake-k8s delete cluster
 

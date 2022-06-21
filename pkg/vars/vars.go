@@ -14,6 +14,9 @@ var (
 	// ProjectName is the name of the project.
 	ProjectName = "fake-k8s"
 
+	// DefaultCluster the default cluster name
+	DefaultCluster = "default"
+
 	// TempDir creates a temporary directory with the given prefix.
 	TempDir = utils.PathJoin(os.TempDir(), ProjectName, "clusters")
 
@@ -100,6 +103,9 @@ var (
 
 	// KubeSchedulerBinary is the binary of kube-scheduler.
 	KubeSchedulerBinary = getEnv("KUBE_SCHEDULER_BINARY", KubeBinaryPrefix+"/kube-scheduler"+BinSuffix)
+
+	// MustKubectlBinary is the binary of kubectl.
+	MustKubectlBinary = "https://dl.k8s.io/release/" + KubeVersion + "/bin/" + runtime.GOOS + "/" + runtime.GOARCH + "/kubectl" + BinSuffix
 
 	// KubectlBinary is the binary of kubectl.
 	KubectlBinary = getEnv("KUBECTL_BINARY", KubeBinaryPrefix+"/kubectl"+BinSuffix)
