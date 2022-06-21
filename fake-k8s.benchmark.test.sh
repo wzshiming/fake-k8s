@@ -28,7 +28,7 @@ function wait_resource() {
   local got
   local all
   while true; do
-    raw="$(kubectl --context=fake-k8s-default get --no-headers "${name}" 2>/dev/null)"
+    raw="$(./fake-k8s kubectl get --no-headers "${name}" 2>/dev/null)"
     got=$(echo "${raw}" | grep -c "${reason}")
     if [ "${got}" -eq "${want}" ]; then
       echo "${name} ${got} done"
@@ -66,14 +66,14 @@ EOF
 function test_create_pod() {
   local size="${1}"
   local node_name
-  node_name="$(kubectl --context=fake-k8s-default get node -o jsonpath='{.items.*.metadata.name}' | tr ' ' '\n' | grep fake- | head -n 1)"
-  gen_pods "${size}" "${node_name}" | kubectl --context=fake-k8s-default create -f - >/dev/null 2>&1 &
+  node_name="$(./fake-k8s kubectl get node -o jsonpath='{.items.*.metadata.name}' | tr ' ' '\n' | grep fake- | head -n 1)"
+  gen_pods "${size}" "${node_name}" | ./fake-k8s kubectl create -f - >/dev/null 2>&1 &
   wait_resource Pod Running "${size}"
 }
 
 function test_delete_pod() {
   local size="${1}"
-  kubectl --context=fake-k8s-default delete pod -l app=fake-pod --grace-period 1 >/dev/null 2>&1 &
+  ./fake-k8s kubectl delete pod -l app=fake-pod --grace-period 1 >/dev/null 2>&1 &
   wait_resource Pod fake-pod- "${size}"
 }
 

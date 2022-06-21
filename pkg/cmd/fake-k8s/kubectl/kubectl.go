@@ -1,7 +1,9 @@
-package cluster
+package kubectl
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/wzshiming/fake-k8s/pkg/log"
@@ -14,23 +16,27 @@ type flagpole struct {
 	Name string
 }
 
-// NewCommand returns a new cobra.Command for cluster creation
+// NewCommand returns a new cobra.Command for getting the list of clusters
 func NewCommand(logger log.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
-		Args:  cobra.NoArgs,
-		Use:   "cluster",
-		Short: "Deletes a cluster",
-		Long:  "Deletes a cluster",
+		Use:   "kubectl",
+		Short: "kubectl in cluster",
+		Long:  "kubectl in cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags.Name = vars.DefaultCluster
-			return runE(cmd.Context(), logger, flags)
+			err := runE(cmd.Context(), logger, flags, args)
+			if err != nil {
+				return fmt.Errorf("%v: %w", args, err)
+			}
+			return nil
 		},
 	}
+	cmd.DisableFlagParsing = true
 	return cmd
 }
 
-func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
+func runE(ctx context.Context, logger log.Logger, flags *flagpole, args []string) error {
 	name := vars.ProjectName + "-" + flags.Name
 	workdir := utils.PathJoin(vars.TempDir, flags.Name)
 
@@ -38,17 +44,15 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 	if err != nil {
 		return err
 	}
-	logger.Printf("Stopping cluster %q", name)
-	err = dc.Down(ctx)
-	if err != nil {
-		logger.Printf("Error stopping cluster %q: %v", name, err)
-	}
 
-	logger.Printf("Deleting cluster %q", name)
-	err = dc.Uninstall(ctx)
+	err = dc.KubectlInCluster(ctx, utils.IOStreams{
+		In:     os.Stdin,
+		Out:    os.Stdout,
+		ErrOut: os.Stderr,
+	}, args...)
+
 	if err != nil {
 		return err
 	}
-	logger.Printf("Cluster %q deleted", name)
 	return nil
 }

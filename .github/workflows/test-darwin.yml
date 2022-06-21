@@ -24,7 +24,6 @@ jobs:
           go build -o kube-apiserver ./cmd/kube-apiserver
           go build -o kube-controller-manager ./cmd/kube-controller-manager
           go build -o kube-scheduler ./cmd/kube-scheduler
-          go build -o kubectl ./cmd/kubectl
       - name: Upload kube binary
         uses: actions/upload-artifact@v2
         with:
@@ -33,7 +32,6 @@ jobs:
             kube-apiserver
             kube-controller-manager
             kube-scheduler
-            kubectl
 
   build-fake-k8s:
     runs-on: macos-latest
@@ -71,8 +69,6 @@ jobs:
           chmod +x kube-apiserver
           chmod +x kube-controller-manager
           chmod +x kube-scheduler
-          chmod +x kubectl
-          mv kubectl /usr/local/bin/
           KUBE_BINARY_PREFIX=$(pwd) RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 1)
 
   e2e-mock-test-binary:
@@ -92,6 +88,4 @@ jobs:
           chmod +x kube-apiserver
           chmod +x kube-controller-manager
           chmod +x kube-scheduler
-          chmod +x kubectl
-          mv kubectl /usr/local/bin/
           KUBE_BINARY_PREFIX=$(pwd) RUNTIME=binary ./fake-k8s.mock.test.sh $(cat supported_releases.txt | head -n 1)

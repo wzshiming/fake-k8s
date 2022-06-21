@@ -25,10 +25,10 @@ func NewCommand(logger log.Logger) *cobra.Command {
 		Short: "Loads a resource",
 		Long:  "Loads a resource",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			flags.Name = vars.DefaultCluster
 			return runE(cmd.Context(), logger, flags)
 		},
 	}
-	cmd.Flags().StringVar(&flags.Name, "name", "default", "cluster name")
 	cmd.Flags().StringVarP(&flags.File, "file", "f", "", "resource file")
 	return cmd
 }
@@ -55,17 +55,13 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 			logger.Printf("Error starting controller %q on %q: %v", controllerName, name, err)
 		}
 	}()
-	kubeconfig, err := dc.InHostKubeconfig()
-	if err != nil {
-		return err
-	}
 
 	file := flags.File
 	if file == "-" {
 		file = "STDIN"
 	}
 	logger.Printf("Loading resource %q on %q", file, name)
-	err = load.Load(ctx, dc, kubeconfig, flags.File)
+	err = load.Load(ctx, dc, flags.File)
 	if err != nil {
 		return err
 	}

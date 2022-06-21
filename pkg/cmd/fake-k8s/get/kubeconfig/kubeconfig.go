@@ -24,10 +24,10 @@ func NewCommand(logger log.Logger) *cobra.Command {
 		Short: "Prints cluster kubeconfig",
 		Long:  "Prints cluster kubeconfig",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			flags.Name = vars.DefaultCluster
 			return runE(cmd.Context(), logger, flags)
 		},
 	}
-	cmd.Flags().StringVar(&flags.Name, "name", "default", "cluster name")
 	return cmd
 }
 
@@ -40,14 +40,10 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 		return err
 	}
 
-	kubeconfigPath, err := dc.InHostKubeconfig()
-	if err != nil {
-		return err
-	}
-	err = dc.Kubectl(ctx, utils.IOStreams{
+	err = dc.KubectlInCluster(ctx, utils.IOStreams{
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,
-	}, "--kubeconfig", kubeconfigPath, "config", "view", "--minify", "--flatten", "--raw")
+	}, "config", "view", "--minify", "--flatten", "--raw")
 
 	if err != nil {
 		return err

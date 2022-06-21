@@ -96,7 +96,7 @@ func (c *Cluster) Install(ctx context.Context, conf Config) error {
 	_, err = exec.LookPath("kubectl")
 	if err != nil {
 		kubectlPath := utils.PathJoin(bin, "kubectl"+vars.BinSuffix)
-		err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.KubectlBinary, kubectlPath, 0755, conf.QuietPull)
+		err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.MustKubectlBinary, kubectlPath, 0755, conf.QuietPull)
 		if err != nil {
 			return err
 		}
@@ -146,6 +146,26 @@ func (c *Cluster) Kubectl(ctx context.Context, stm utils.IOStreams, args ...stri
 	if err != nil {
 		bin := utils.PathJoin(conf.Workdir, "bin")
 		kubectlPath = utils.PathJoin(bin, "kubectl"+vars.BinSuffix)
+		err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.MustKubectlBinary, kubectlPath, 0755, conf.QuietPull)
+		if err != nil {
+			return err
+		}
 	}
 	return utils.Exec(ctx, "", stm, kubectlPath, args...)
+}
+
+func (c *Cluster) KubectlInCluster(ctx context.Context, stm utils.IOStreams, args ...string) error {
+	conf, err := c.Config()
+	if err != nil {
+		return err
+	}
+
+	bin := utils.PathJoin(conf.Workdir, "bin")
+	kubectlPath := utils.PathJoin(bin, "kubectl"+vars.BinSuffix)
+	err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.MustKubectlBinary, kubectlPath, 0755, conf.QuietPull)
+	if err != nil {
+		return err
+	}
+	return utils.Exec(ctx, "", stm, kubectlPath,
+		append([]string{"--kubeconfig", utils.PathJoin(conf.Workdir, InHostKubeconfigName)}, args...)...)
 }
