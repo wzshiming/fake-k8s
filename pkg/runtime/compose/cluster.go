@@ -114,6 +114,8 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		GenerateNodeName:           conf.GenerateNodeName,
 		GenerateReplicas:           conf.GenerateReplicas,
 		NodeName:                   conf.NodeName,
+		RuntimeConfig:              conf.RuntimeConfig,
+		FeatureGates:               conf.FeatureGates,
 	})
 	if err != nil {
 		return err

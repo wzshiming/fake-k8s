@@ -43,6 +43,12 @@ type Config struct {
 
 	// Pull image
 	QuietPull bool
+
+	// Feature gates of Kubernetes
+	FeatureGates string
+
+	// Runtime config of Kubernetes
+	RuntimeConfig string
 }
 
 type Runtime interface {

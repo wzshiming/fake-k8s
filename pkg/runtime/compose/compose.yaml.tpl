@@ -48,10 +48,15 @@ ${{ end }}
       - http://${{ .ProjectName }}-etcd:2379
       - --etcd-prefix
       - /prefix/registry
-      - --default-watch-cache-size
-      - "10000"
       - --allow-privileged
-
+${{ if .RuntimeConfig }}
+      - --runtime-config
+      - ${{ .RuntimeConfig }}
+${{ end }}
+${{ if .FeatureGates }}
+      - --feature-gates
+      - ${{ .FeatureGates }}
+${{ end }}
 ${{ if .SecretPort }}
       - --bind-address
       - 0.0.0.0
@@ -95,7 +100,10 @@ ${{ end }}
       - kube-controller-manager
       - --kubeconfig
       - ${{ .InClusterKubeconfigPath }}
-
+${{ if .FeatureGates }}
+      - --feature-gates
+      - ${{ .FeatureGates }}
+${{ end }}
 ${{ if .PrometheusPath }}
 ${{ if .SecretPort }}
       - --bind-address
@@ -130,7 +138,10 @@ ${{ end }}
       - kube-scheduler
       - --kubeconfig
       - ${{ .InClusterKubeconfigPath }}
-
+${{ if .FeatureGates }}
+      - --feature-gates
+      - ${{ .FeatureGates }}
+${{ end }}
 ${{ if .PrometheusPath }}
 ${{ if .SecretPort }}
       - --bind-address

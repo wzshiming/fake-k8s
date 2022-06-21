@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
@@ -28,8 +29,18 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		return err
 	}
 
+	var featureGates []string
+	var runtimeConfig []string
+	if conf.FeatureGates != "" {
+		featureGates = strings.Split(strings.ReplaceAll(conf.FeatureGates, "=", ": "), ",")
+	}
+	if conf.RuntimeConfig != "" {
+		runtimeConfig = strings.Split(strings.ReplaceAll(conf.RuntimeConfig, "=", ": "), ",")
+	}
 	kindYaml, err := BuildKind(BuildKindConfig{
 		PrometheusPort: conf.PrometheusPort,
+		FeatureGates:   featureGates,
+		RuntimeConfig:  runtimeConfig,
 	})
 	if err != nil {
 		return err

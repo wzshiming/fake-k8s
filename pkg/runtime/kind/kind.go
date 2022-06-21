@@ -23,4 +23,7 @@ func BuildKind(conf BuildKindConfig) (string, error) {
 
 type BuildKindConfig struct {
 	PrometheusPort uint32
+
+	RuntimeConfig []string
+	FeatureGates  []string
 }

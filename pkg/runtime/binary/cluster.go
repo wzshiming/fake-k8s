@@ -161,10 +161,21 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"http://" + localAddress + ":" + etcdClientPortStr,
 		"--etcd-prefix",
 		"/prefix/registry",
-		"--default-watch-cache-size",
-		"10000",
 		"--allow-privileged",
 	}
+	if conf.RuntimeConfig != "" {
+		kubeApiserverArgs = append(kubeApiserverArgs,
+			"--runtime-config",
+			conf.RuntimeConfig,
+		)
+	}
+	if conf.FeatureGates != "" {
+		kubeApiserverArgs = append(kubeApiserverArgs,
+			"--feature-gates",
+			conf.FeatureGates,
+		)
+	}
+
 	if conf.SecretPort {
 		kubeApiserverArgs = append(kubeApiserverArgs,
 			"--bind-address",
@@ -231,6 +242,12 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"--kubeconfig",
 		kubeconfigPath,
 	}
+	if conf.FeatureGates != "" {
+		kubeControllerManagerArgs = append(kubeControllerManagerArgs,
+			"--feature-gates",
+			conf.FeatureGates,
+		)
+	}
 
 	kubeControllerManagerPort, err := utils.GetUnusedPort()
 	if err != nil {
@@ -265,6 +282,13 @@ func (c *Cluster) Up(ctx context.Context) error {
 		"--kubeconfig",
 		kubeconfigPath,
 	}
+	if conf.FeatureGates != "" {
+		kubeSchedulerArgs = append(kubeSchedulerArgs,
+			"--feature-gates",
+			conf.FeatureGates,
+		)
+	}
+
 	kubeSchedulerPort, err := utils.GetUnusedPort()
 	if err != nil {
 		return err
