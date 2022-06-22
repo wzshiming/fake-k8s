@@ -1,5 +1,10 @@
 package k8s
 
+import (
+	"os"
+	"runtime"
+)
+
 // lists from https://github.com/kubernetes/kubernetes/blob/2d7dcf928c3e0e8dd4c29c421893a299e1a1b857/cmd/kubeadm/app/constants/constants.go#L491
 var etcdVersions = map[int]string{
 	8:  "3.0.17",
@@ -30,4 +35,8 @@ func GetEtcdVersion(version int) string {
 		version = 25
 	}
 	return etcdVersions[version]
+}
+
+func init() {
+	os.Setenv("ETCD_UNSUPPORTED_ARCH", runtime.GOARCH)
 }
