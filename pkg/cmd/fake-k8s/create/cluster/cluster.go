@@ -159,15 +159,9 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 	}
 
 	logger.Printf("Wait for cluster %q to be ready", name)
-	for i := 0; ; i++ {
-		ready, err := dc.Ready(ctx)
-		if ready {
-			break
-		}
-		time.Sleep(time.Second)
-		if i > 30 {
-			return err
-		}
+	err = dc.WaitReady(ctx, 30*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed wait for cluster %q be ready: %w", name, err)
 	}
 
 	logger.Printf("Cluster %q is ready", name)

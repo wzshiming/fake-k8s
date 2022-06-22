@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/wzshiming/fake-k8s/pkg/utils"
 )
@@ -61,6 +62,9 @@ type Runtime interface {
 
 	// Ready check the cluster is ready
 	Ready(ctx context.Context) (bool, error)
+
+	// WaitReady wait the cluster is ready
+	WaitReady(ctx context.Context, timeout time.Duration) error
 
 	// Up start the cluster
 	Up(ctx context.Context) error

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
@@ -129,6 +130,19 @@ func (c *Cluster) Ready(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (c *Cluster) WaitReady(ctx context.Context, timeout time.Duration) error {
+	var err error
+	var ready bool
+	for i := 0; i < int(timeout/time.Second); i++ {
+		ready, err = c.Ready(ctx)
+		if ready {
+			return nil
+		}
+		time.Sleep(time.Second)
+	}
+	return err
 }
 
 func (c *Cluster) Kubectl(ctx context.Context, stm utils.IOStreams, args ...string) error {
