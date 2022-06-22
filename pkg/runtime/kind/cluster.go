@@ -146,15 +146,9 @@ func (c *Cluster) Up(ctx context.Context) error {
 		return err
 	}
 
-	for i := 0; ; i++ {
-		ready, err := c.Ready(ctx)
-		if ready {
-			break
-		}
-		time.Sleep(time.Second)
-		if i > 30 {
-			return err
-		}
+	err = c.WaitReady(ctx, 30*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to wait for kube-apiserver ready: %v", err)
 	}
 
 	err = c.Kubectl(ctx, utils.IOStreams{}, "cordon", conf.Name+"-control-plane")

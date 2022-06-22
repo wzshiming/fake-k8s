@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
 	"github.com/wzshiming/fake-k8s/pkg/log"
@@ -238,16 +237,6 @@ func (c *Cluster) Up(ctx context.Context) error {
 		return err
 	}
 
-	for i := 0; ; i++ {
-		ready, err := c.Ready(ctx)
-		if ready {
-			break
-		}
-		time.Sleep(time.Second)
-		if i > 30 {
-			return err
-		}
-	}
 	return nil
 }
 
