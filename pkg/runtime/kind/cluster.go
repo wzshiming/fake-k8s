@@ -80,6 +80,34 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 			return fmt.Errorf("failed to write %s: %w", runtime.PrometheusDeploy, err)
 		}
 	}
+
+	var out io.Writer = os.Stderr
+	if conf.QuietPull {
+		out = nil
+	}
+	images := []string{
+		conf.KindNodeImage,
+		conf.FakeKubeletImage,
+	}
+	if conf.PrometheusPort != 0 {
+		images = append(images, conf.PrometheusImage)
+	}
+	for _, image := range images {
+		err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "inspect",
+			image,
+		)
+		if err != nil {
+			err = utils.Exec(ctx, "", utils.IOStreams{
+				Out:    out,
+				ErrOut: out,
+			}, "docker", "pull",
+				image,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -134,18 +162,6 @@ func (c *Cluster) Up(ctx context.Context) error {
 		return err
 	}
 
-	err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "inspect",
-		conf.FakeKubeletImage,
-	)
-	if err != nil {
-		err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "pull",
-			conf.FakeKubeletImage,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	err = utils.Exec(ctx, "", utils.IOStreams{}, "kind", "load", "docker-image",
 		conf.FakeKubeletImage,
 		"--name", conf.Name,
@@ -161,18 +177,6 @@ func (c *Cluster) Up(ctx context.Context) error {
 	}
 
 	if conf.PrometheusPort != 0 {
-		err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "inspect",
-			conf.PrometheusImage,
-		)
-		if err != nil {
-			err = utils.Exec(ctx, "", utils.IOStreams{}, "docker", "pull",
-				conf.PrometheusImage,
-			)
-			if err != nil {
-				return err
-			}
-		}
-
 		err = utils.Exec(ctx, "", utils.IOStreams{}, "kind", "load", "docker-image",
 			conf.PrometheusImage,
 			"--name", conf.Name,
