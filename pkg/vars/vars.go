@@ -23,6 +23,9 @@ var (
 	// CacheDir creates a cache directory with the given prefix.
 	CacheDir = utils.PathJoin(os.TempDir(), ProjectName, "cache")
 
+	// ApiserverPort is the port to expose apiserver.
+	ApiserverPort = getEnvInt("APISERVER_PORT", 0)
+
 	// Runtime is the runtime to use.
 	Runtime = getEnv("RUNTIME", detectionRuntime())
 

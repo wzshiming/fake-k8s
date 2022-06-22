@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	Name    string
-	Workdir string
-	Runtime string
+	Name          string
+	ApiserverPort uint32
+	Workdir       string
+	Runtime       string
 
 	PrometheusPort   uint32
 	GenerateNodeName string
