@@ -12,17 +12,22 @@ import (
 	"strconv"
 )
 
-func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string, match string, mode fs.FileMode, quiet bool) error {
+func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string, match string, mode fs.FileMode, quiet bool, clean bool) error {
 	if _, err := os.Stat(dest); err == nil {
 		return nil
 	}
 
-	cacheTar, err := getCache(ctx, cacheDir, src, 0644, quiet)
+	cacheTar, err := getCachePath(cacheDir, src)
 	if err != nil {
 		return err
 	}
 	cache := PathJoin(filepath.Dir(cacheTar), match)
-	if _, err := os.Stat(cache); err != nil {
+	if _, err = os.Stat(cache); err != nil {
+		cacheTar, err = getCache(ctx, cacheDir, src, 0644, quiet)
+		if err != nil {
+			return err
+		}
+		cache = PathJoin(filepath.Dir(cacheTar), match)
 		err = Untar(cacheTar, func(file string) (string, bool) {
 			if filepath.Base(file) == match {
 				return cache, true
@@ -31,6 +36,9 @@ func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string
 		})
 		if err != nil {
 			return err
+		}
+		if clean {
+			os.Remove(cacheTar)
 		}
 		os.Chmod(cache, mode)
 	}
@@ -66,17 +74,34 @@ func DownloadWithCache(ctx context.Context, cacheDir, src, dest string, mode fs.
 	return nil
 }
 
-func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet bool) (string, error) {
+func getCachePath(cacheDir, src string) (string, error) {
 	u, err := url.Parse(src)
 	if err != nil {
 		return "", err
 	}
 	switch u.Scheme {
 	case "http", "https":
-		cache := PathJoin(cacheDir, u.Scheme, u.Path)
-		if _, err := os.Stat(cache); err == nil {
-			return cache, nil
-		}
+		return PathJoin(cacheDir, u.Scheme, u.Host, u.Path), nil
+	default:
+		return src, nil
+	}
+}
+
+func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet bool) (string, error) {
+	cache, err := getCachePath(cacheDir, src)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(cache); err == nil {
+		return cache, nil
+	}
+
+	u, err := url.Parse(src)
+	if err != nil {
+		return "", err
+	}
+	switch u.Scheme {
+	case "http", "https":
 		cli := &http.Client{}
 		req, err := http.NewRequest("GET", u.String(), nil)
 		if err != nil {
