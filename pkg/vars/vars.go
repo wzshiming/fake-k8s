@@ -39,7 +39,7 @@ var (
 	PrometheusPort = getEnvInt("PROMETHEUS_PORT", 0)
 
 	// FakeVersion is the version of the fake to use.
-	FakeVersion = getEnv("FAKE_VERSION", "v0.7.3")
+	FakeVersion = getEnv("FAKE_VERSION", "v0.7.4")
 
 	// KubeVersion is the version of Kubernetes to use.
 	KubeVersion = getEnv("KUBE_VERSION", "v1.24.1")
