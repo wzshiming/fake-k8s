@@ -47,7 +47,7 @@ func NewCommand(logger log.Logger) *cobra.Command {
 		Args:  cobra.NoArgs,
 		Use:   "cluster",
 		Short: "Creates a fake Kubernetes cluster",
-		Long:  "Creates a fake Kubernetes cluster using container",
+		Long:  "Creates a fake Kubernetes cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags.Name = vars.DefaultCluster
 			return runE(cmd.Context(), logger, flags)

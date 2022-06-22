@@ -19,8 +19,8 @@ func NewCommand(logger log.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Args:  cobra.NoArgs,
 		Use:   "fake-k8s [command]",
-		Short: "fake-k8s is a fake k8s",
-		Long:  `fake-k8s is a fake k8s`,
+		Short: "fake-k8s is a fake Kubernetes cluster manager tools",
+		Long:  `fake-k8s is a fake Kubernetes cluster manager tools`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("subcommand is required")
 		},

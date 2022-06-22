@@ -28,8 +28,8 @@ func NewCommand(logger log.Logger) *cobra.Command {
 			return fmt.Errorf("unknown component for %q", cmd.CommandPath())
 		},
 		Use:   "logs",
-		Short: "logs of [etcd, kube-apiserver, kube-controller-manager, kube-scheduler, fake-kubelet, prometheus]",
-		Long:  "logs of [etcd, kube-apiserver, kube-controller-manager, kube-scheduler, fake-kubelet, prometheus]",
+		Short: "Logs one of [etcd, kube-apiserver, kube-controller-manager, kube-scheduler, fake-kubelet, prometheus]",
+		Long:  "Logs one of [etcd, kube-apiserver, kube-controller-manager, kube-scheduler, fake-kubelet, prometheus]",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags.Name = vars.DefaultCluster
 			return runE(cmd.Context(), logger, flags, args)
