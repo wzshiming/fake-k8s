@@ -62,14 +62,14 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 	}
 
 	etcdPath := utils.PathJoin(bin, "etcd"+vars.BinSuffix)
-	err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.EtcdBinaryTar, etcdPath, "etcd"+vars.BinSuffix, 0755, conf.QuietPull)
+	err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.EtcdBinaryTar, etcdPath, "etcd"+vars.BinSuffix, 0755, conf.QuietPull, true)
 	if err != nil {
 		return err
 	}
 
 	if conf.PrometheusPort != 0 {
 		prometheusPath := utils.PathJoin(bin, "prometheus"+vars.BinSuffix)
-		err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.PrometheusBinaryTar, prometheusPath, "prometheus"+vars.BinSuffix, 0755, conf.QuietPull)
+		err = utils.DownloadWithCacheAndExtract(ctx, conf.CacheDir, conf.PrometheusBinaryTar, prometheusPath, "prometheus"+vars.BinSuffix, 0755, conf.QuietPull, true)
 		if err != nil {
 			return err
 		}
