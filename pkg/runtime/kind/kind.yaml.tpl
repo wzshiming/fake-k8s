@@ -3,7 +3,9 @@ apiVersion: kind.x-k8s.io/v1alpha4
 
 networking:
   apiServerAddress: "0.0.0.0"
-  # apiServerPort: 6443
+${{ if .ApiserverPort }}
+  apiServerPort: ${{ .ApiserverPort }}
+${{ end }}
 nodes:
   - role: control-plane
 

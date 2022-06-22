@@ -151,9 +151,12 @@ func (c *Cluster) Up(ctx context.Context) error {
 		return err
 	}
 
-	apiserverPort, err := utils.GetUnusedPort()
-	if err != nil {
-		return err
+	apiserverPort := int(conf.ApiserverPort)
+	if apiserverPort == 0 {
+		apiserverPort, err = utils.GetUnusedPort()
+		if err != nil {
+			return err
+		}
 	}
 	apiserverPortStr := strconv.Itoa(apiserverPort)
 

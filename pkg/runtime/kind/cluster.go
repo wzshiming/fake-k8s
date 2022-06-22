@@ -40,6 +40,7 @@ func (c *Cluster) Install(ctx context.Context, conf runtime.Config) error {
 		runtimeConfig = strings.Split(strings.ReplaceAll(conf.RuntimeConfig, "=", ": "), ",")
 	}
 	kindYaml, err := BuildKind(BuildKindConfig{
+		ApiserverPort:  conf.ApiserverPort,
 		PrometheusPort: conf.PrometheusPort,
 		FeatureGates:   featureGates,
 		RuntimeConfig:  runtimeConfig,
