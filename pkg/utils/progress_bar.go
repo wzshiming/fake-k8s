@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -11,13 +12,11 @@ type ProgressBar struct {
 	current        int
 	lastUpdateTime time.Time
 	startTime      time.Time
-	messageFunc    func(total, current int, elapsed time.Duration) string
 }
 
-func NewProgressBar(messageFunc func(total, current int, elapsed time.Duration) string) *ProgressBar {
+func NewProgressBar() *ProgressBar {
 	return &ProgressBar{
-		startTime:   time.Now(),
-		messageFunc: messageFunc,
+		startTime: time.Now(),
 	}
 }
 
@@ -37,11 +36,9 @@ func (p *ProgressBar) Print() {
 	}
 	p.lastUpdateTime = now
 
-	message := p.messageFunc(p.total, p.current, now.Sub(p.startTime))
-
 	if p.current >= p.total {
-		fmt.Fprintf(os.Stderr, "\r%s 100%% %s    \n", message, time.Since(p.startTime).Truncate(time.Second/10))
+		fmt.Fprintf(os.Stderr, "\r%-60s| 100%%  %-5s\n", strings.Repeat("#", 60), time.Since(p.startTime).Truncate(time.Second))
 	} else {
-		fmt.Fprintf(os.Stderr, "\r%s %.1f%% %s", message, float64(p.current)/float64(p.total)*100, time.Since(p.startTime).Truncate(time.Second/10))
+		fmt.Fprintf(os.Stderr, "\r%-60s| %.1f%% %-5s", strings.Repeat("#", int(float64(p.current)/float64(p.total)*60)), float64(p.current)/float64(p.total)*100, time.Since(p.startTime).Truncate(time.Second))
 	}
 }

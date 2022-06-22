@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 )
 
 func DownloadWithCacheAndExtract(ctx context.Context, cacheDir, src, dest string, match string, mode fs.FileMode, quiet bool) error {
@@ -107,14 +106,8 @@ func getCache(ctx context.Context, cacheDir, src string, mode fs.FileMode, quiet
 
 		var srcReader io.Reader = resp.Body
 		if !quiet {
-			message := filepath.Base(src)
-			pb := NewProgressBar(func(total, current int, elapsed time.Duration) string {
-				if total <= current {
-					return "Download Complete " + message
-				}
-				return "Downloading " + message
-			})
-
+			fmt.Fprintf(os.Stderr, "Download %s\n", src)
+			pb := NewProgressBar()
 			contentLengthInt, _ := strconv.Atoi(contentLength)
 			counter := newCounterWriter(func(counter int) {
 				pb.Update(counter, contentLengthInt)
