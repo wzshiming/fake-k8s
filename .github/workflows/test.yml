@@ -68,7 +68,7 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          RUNTIME=kind ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 9)
+          RUNTIME=kind ./fake-k8s.test.sh $(cat supported_releases.txt | head -n -6)
 
   e2e-mock-test-kind:
     runs-on: ubuntu-latest
@@ -106,7 +106,7 @@ jobs:
       - name: Run test
         run: |
           chmod +x fake-k8s
-          RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n 12)
+          RUNTIME=binary ./fake-k8s.test.sh $(cat supported_releases.txt | head -n -3)
 
   e2e-mock-test-binary:
     runs-on: ubuntu-latest
