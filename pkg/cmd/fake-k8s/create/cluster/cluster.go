@@ -149,13 +149,13 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 		RuntimeConfig:               flags.RuntimeConfig,
 	})
 	if err != nil {
-		return fmt.Errorf("failed install %q cluster: %w", name, err)
+		return fmt.Errorf("failed install cluster %q: %w", name, err)
 	}
 
 	logger.Printf("Starting cluster %q", name)
 	err = dc.Up(ctx)
 	if err != nil {
-		return fmt.Errorf("failed start %q cluster: %w", name, err)
+		return fmt.Errorf("failed start cluster %q: %w", name, err)
 	}
 
 	logger.Printf("Wait for cluster %q to be ready", name)
