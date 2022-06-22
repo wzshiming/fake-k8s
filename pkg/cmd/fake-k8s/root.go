@@ -9,6 +9,7 @@ import (
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/get"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/kubectl"
 	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/load"
+	"github.com/wzshiming/fake-k8s/pkg/cmd/fake-k8s/logs"
 	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/vars"
 )
@@ -34,6 +35,7 @@ func NewCommand(logger log.Logger) *cobra.Command {
 		get.NewCommand(logger),
 		load.NewCommand(logger),
 		kubectl.NewCommand(logger),
+		logs.NewCommand(logger),
 	)
 	return cmd
 }

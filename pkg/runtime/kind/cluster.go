@@ -5,8 +5,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/runtime"
@@ -97,6 +99,36 @@ func (c *Cluster) Up(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	kubeconfig, err := c.InHostKubeconfig()
+	if err != nil {
+		return err
+	}
+
+	kubeconfigBuf := bytes.NewBuffer(nil)
+	err = c.Kubectl(ctx, utils.IOStreams{
+		Out: kubeconfigBuf,
+	}, "config", "view", "--minify=true", "--raw=true")
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(kubeconfig, kubeconfigBuf.Bytes(), 0644)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; ; i++ {
+		ready, err := c.Ready(ctx)
+		if ready {
+			break
+		}
+		time.Sleep(time.Second)
+		if i > 30 {
+			return err
+		}
+	}
+
 	err = c.Kubectl(ctx, utils.IOStreams{}, "cordon", conf.Name+"-control-plane")
 	if err != nil {
 		return err
@@ -156,24 +188,6 @@ func (c *Cluster) Up(ctx context.Context) error {
 		}
 	}
 
-	kubeconfig, err := c.InHostKubeconfig()
-	if err != nil {
-		return err
-	}
-
-	kubeconfigBuf := bytes.NewBuffer(nil)
-	err = c.Kubectl(ctx, utils.IOStreams{
-		Out: kubeconfigBuf,
-	}, "config", "view", "--minify=true", "--raw=true")
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(kubeconfig, kubeconfigBuf.Bytes(), 0644)
-	if err != nil {
-		return err
-	}
-
 	// set the context in default kubeconfig
 	c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "contexts."+conf.Name+".cluster", "kind-"+conf.Name)
 	c.Kubectl(ctx, utils.IOStreams{}, "config", "set", "contexts."+conf.Name+".user", "kind-"+conf.Name)
@@ -222,4 +236,39 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Cluster) logs(ctx context.Context, name string, out io.Writer, follow bool) error {
+	conf, err := c.Config()
+	if err != nil {
+		return err
+	}
+	switch name {
+	case "fake-kubelet", "prometheus":
+	default:
+		name = name + "-" + conf.Name + "-control-plane"
+	}
+
+	args := []string{"logs", "-n", "kube-system"}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, name)
+
+	err = c.Kubectl(ctx, utils.IOStreams{
+		ErrOut: out,
+		Out:    out,
+	}, args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Cluster) Logs(ctx context.Context, name string, out io.Writer) error {
+	return c.logs(ctx, name, out, false)
+}
+
+func (c *Cluster) LogsFollow(ctx context.Context, name string, out io.Writer) error {
+	return c.logs(ctx, name, out, true)
 }

@@ -4,10 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/nxadm/tail"
 	"github.com/wzshiming/fake-k8s/pkg/k8s"
 	"github.com/wzshiming/fake-k8s/pkg/log"
 	"github.com/wzshiming/fake-k8s/pkg/pki"
@@ -233,7 +236,7 @@ func (c *Cluster) Up(ctx context.Context) error {
 			break
 		}
 		time.Sleep(time.Second)
-		if i > 10 {
+		if i > 30 {
 			return err
 		}
 	}
@@ -486,5 +489,46 @@ func (c *Cluster) Stop(ctx context.Context, name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to kill %s: %w", name, err)
 	}
+	return nil
+}
+
+func (c *Cluster) Logs(ctx context.Context, name string, out io.Writer) error {
+	conf, err := c.Config()
+	if err != nil {
+		return err
+	}
+
+	logs := utils.PathJoin(conf.Workdir, "logs", filepath.Base(name)+".log")
+
+	f, err := os.OpenFile(logs, os.O_RDONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	io.Copy(out, f)
+	return nil
+}
+
+func (c *Cluster) LogsFollow(ctx context.Context, name string, out io.Writer) error {
+	conf, err := c.Config()
+	if err != nil {
+		return err
+	}
+
+	logs := utils.PathJoin(conf.Workdir, "logs", filepath.Base(name)+".log")
+
+	t, err := tail.TailFile(logs, tail.Config{ReOpen: true, Follow: true})
+	if err != nil {
+		return err
+	}
+	defer t.Stop()
+
+	go func() {
+		for line := range t.Lines {
+			out.Write([]byte(line.Text + "\n"))
+		}
+	}()
+	<-ctx.Done()
 	return nil
 }
