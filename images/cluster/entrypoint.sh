@@ -1,6 +1,5 @@
 #!/bin/sh
 
-fake-k8s delete cluster >&2
 APISERVER_PORT=0 fake-k8s create cluster || exit 1
 
 echo "==============================" >&2
