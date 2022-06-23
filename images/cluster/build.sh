@@ -10,10 +10,21 @@ if [[ -z "${base_image}" ]] || [[ -z "${cluster_image_prefix}" ]]; then
   exit 1
 fi
 
-for release in $(cat "${DIR}/../../supported_releases.txt"); do
+for release in $(cat "${DIR}/../../supported_releases.txt" | head -n -4); do
   docker buildx build \
     --push \
     --platform linux/amd64,linux/arm64 \
+    --build-arg base_image="${base_image}" \
+    --build-arg kube_version="${release}" \
+    -t "${cluster_image_prefix}:${release%\.*}" \
+    -f "${DIR}/Dockerfile" \
+    "${DIR}"
+done
+
+for release in $(cat "${DIR}/../../supported_releases.txt" | tail -n 4); do
+  docker buildx build \
+    --push \
+    --platform linux/amd64 \
     --build-arg base_image="${base_image}" \
     --build-arg kube_version="${release}" \
     -t "${cluster_image_prefix}:${release%\.*}" \

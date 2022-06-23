@@ -6,8 +6,7 @@ ENV KUBE_VERSION $kube_version
 
 RUN fake-k8s create cluster --quiet-pull && \
     fake-k8s kubectl version && \
-    fake-k8s delete cluster || \
-    fake-k8s logs etcd
+    fake-k8s delete cluster
 
 COPY entrypoint.sh /entrypoint.sh
 
