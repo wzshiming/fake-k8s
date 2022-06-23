@@ -23,7 +23,7 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 	}
 
 	logPath := PathJoin(dir, "logs", filepath.Base(name)+".log")
-	cmdlinesPath := PathJoin(dir, "cmdlines", filepath.Base(name))
+	cmdlinePath := PathJoin(dir, "cmdline", filepath.Base(name))
 
 	err = os.MkdirAll(filepath.Dir(pidPath), 0755)
 	if err != nil {
@@ -33,7 +33,7 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(filepath.Dir(cmdlinesPath), 0755)
+	err = os.MkdirAll(filepath.Dir(cmdlinePath), 0755)
 	if err != nil {
 		return err
 	}
@@ -45,9 +45,9 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 
 	args := append([]string{name}, arg...)
 
-	err = os.WriteFile(cmdlinesPath, []byte(strings.Join(args, " ")), 0644)
+	err = os.WriteFile(cmdlinePath, []byte(strings.Join(args, "\x00")), 0644)
 	if err != nil {
-		return fmt.Errorf("write cmdline file %s: %w", cmdlinesPath, err)
+		return fmt.Errorf("write cmdline file %s: %w", cmdlinePath, err)
 	}
 
 	cmd := startProcess(ctx, args[0], args[1:]...)
@@ -67,14 +67,14 @@ func ForkExec(ctx context.Context, dir string, name string, arg ...string) error
 }
 
 func ForkExecRestart(ctx context.Context, dir string, name string) error {
-	cmdlinesPath := PathJoin(dir, "cmdlines", filepath.Base(name))
+	cmdlinePath := PathJoin(dir, "cmdline", filepath.Base(name))
 
-	data, err := os.ReadFile(cmdlinesPath)
+	data, err := os.ReadFile(cmdlinePath)
 	if err != nil {
 		return err
 	}
 
-	args := strings.Split(string(data), " ")
+	args := strings.Split(string(data), "\x00")
 
 	return ForkExec(ctx, dir, args[0], args...)
 }
