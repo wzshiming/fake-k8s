@@ -1,0 +1,27 @@
+name: Build Image
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build-cluster-image:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    - name: Log into registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+    - name: Build fake-k8s image
+      run: |
+        REF=${{ github.ref }}
+        TAG="${REF##*/}"
+        ./images/fake-k8s/build.sh "ghcr.io/wzshiming/fake-k8s/fake-k8s:${TAG}"
+    - name: Build cluster image
+      run: |
+        REF=${{ github.ref }}
+        TAG="${REF##*/}"
+        ./images/cluster/build.sh "ghcr.io/wzshiming/fake-k8s/fake-k8s:${TAG}" "ghcr.io/wzshiming/fake-k8s/cluster"
