@@ -9,9 +9,7 @@ import (
 
 //go:generate ./feature_gates_data.sh 24
 
-var lockEnabled = map[string]bool{
-	"PodSecurity": true,
-}
+var lockEnabled = map[string]bool{}
 
 func GetFeatureGates(version int) string {
 	// Enable only the beta feature of the final GA
