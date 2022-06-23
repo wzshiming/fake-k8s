@@ -6,7 +6,6 @@
 latest_release="${1:-24}"
 
 function features() {
-
     for i in $(seq 6 "${latest_release}"); do
         curl -sSL "https://github.com/kubernetes/kubernetes/raw/release-1.${i}/pkg/features/kube_features.go" |
             grep "{Default: " |
