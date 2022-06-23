@@ -94,13 +94,10 @@ func (c *Cluster) Install(ctx context.Context, conf Config) error {
 
 	bin := utils.PathJoin(conf.Workdir, "bin")
 
-	_, err = exec.LookPath("kubectl")
+	kubectlPath := utils.PathJoin(bin, "kubectl"+vars.BinSuffix)
+	err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.MustKubectlBinary, kubectlPath, 0755, conf.QuietPull)
 	if err != nil {
-		kubectlPath := utils.PathJoin(bin, "kubectl"+vars.BinSuffix)
-		err = utils.DownloadWithCache(ctx, conf.CacheDir, vars.MustKubectlBinary, kubectlPath, 0755, conf.QuietPull)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	if err != nil {

@@ -116,43 +116,60 @@ func runE(ctx context.Context, logger log.Logger, flags *flagpole) error {
 	if err != nil {
 		return err
 	}
-	_, err = dc.Config()
+	conf, err := dc.Config()
 	if err == nil {
 		logger.Printf("Cluster %q already exists", name)
-		return nil
-	}
 
-	logger.Printf("Creating cluster %q", name)
-	err = dc.Install(ctx, runtime.Config{
-		Name:                        name,
-		ApiserverPort:               flags.ApiserverPort,
-		Workdir:                     workdir,
-		Runtime:                     flags.Runtime,
-		PrometheusImage:             flags.PrometheusImage,
-		EtcdImage:                   flags.EtcdImage,
-		KubeApiserverImage:          flags.KubeApiserverImage,
-		KubeControllerManagerImage:  flags.KubeControllerManagerImage,
-		KubeSchedulerImage:          flags.KubeSchedulerImage,
-		FakeKubeletImage:            flags.FakeKubeletImage,
-		KindNodeImage:               flags.KindNodeImage,
-		KubeApiserverBinary:         flags.KubeApiserverBinary,
-		KubeControllerManagerBinary: flags.KubeControllerManagerBinary,
-		KubeSchedulerBinary:         flags.KubeSchedulerBinary,
-		FakeKubeletBinary:           flags.FakeKubeletBinary,
-		EtcdBinaryTar:               flags.EtcdBinaryTar,
-		PrometheusBinaryTar:         flags.PrometheusBinaryTar,
-		CacheDir:                    vars.CacheDir,
-		SecretPort:                  flags.SecurePort,
-		QuietPull:                   flags.QuietPull,
-		PrometheusPort:              flags.PrometheusPort,
-		GenerateNodeName:            flags.GenerateNodeName,
-		GenerateReplicas:            flags.GenerateReplicas,
-		NodeName:                    strings.Join(flags.NodeName, ","),
-		FeatureGates:                flags.FeatureGates,
-		RuntimeConfig:               flags.RuntimeConfig,
-	})
-	if err != nil {
-		return fmt.Errorf("failed install cluster %q: %w", name, err)
+		ready, err := dc.Ready(ctx)
+		if err == nil && ready {
+			logger.Printf("Cluster %q is already ready", name)
+			return nil
+		}
+
+		logger.Printf("Cluster %q is not ready yet, will be restarted", name)
+		err = dc.Install(ctx, *conf)
+		if err != nil {
+			logger.Printf("Failed to continue install cluster %q: %v", name, err)
+			return err
+		}
+
+		err = dc.Down(ctx)
+		if err != nil {
+			logger.Printf("Failed to down cluster %q: %v", name, err)
+		}
+	} else {
+		logger.Printf("Creating cluster %q", name)
+		err = dc.Install(ctx, runtime.Config{
+			Name:                        name,
+			ApiserverPort:               flags.ApiserverPort,
+			Workdir:                     workdir,
+			Runtime:                     flags.Runtime,
+			PrometheusImage:             flags.PrometheusImage,
+			EtcdImage:                   flags.EtcdImage,
+			KubeApiserverImage:          flags.KubeApiserverImage,
+			KubeControllerManagerImage:  flags.KubeControllerManagerImage,
+			KubeSchedulerImage:          flags.KubeSchedulerImage,
+			FakeKubeletImage:            flags.FakeKubeletImage,
+			KindNodeImage:               flags.KindNodeImage,
+			KubeApiserverBinary:         flags.KubeApiserverBinary,
+			KubeControllerManagerBinary: flags.KubeControllerManagerBinary,
+			KubeSchedulerBinary:         flags.KubeSchedulerBinary,
+			FakeKubeletBinary:           flags.FakeKubeletBinary,
+			EtcdBinaryTar:               flags.EtcdBinaryTar,
+			PrometheusBinaryTar:         flags.PrometheusBinaryTar,
+			CacheDir:                    vars.CacheDir,
+			SecretPort:                  flags.SecurePort,
+			QuietPull:                   flags.QuietPull,
+			PrometheusPort:              flags.PrometheusPort,
+			GenerateNodeName:            flags.GenerateNodeName,
+			GenerateReplicas:            flags.GenerateReplicas,
+			NodeName:                    strings.Join(flags.NodeName, ","),
+			FeatureGates:                flags.FeatureGates,
+			RuntimeConfig:               flags.RuntimeConfig,
+		})
+		if err != nil {
+			return fmt.Errorf("failed install cluster %q: %w", name, err)
+		}
 	}
 
 	logger.Printf("Starting cluster %q", name)
