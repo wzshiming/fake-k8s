@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -122,11 +123,17 @@ func (c *Cluster) Uninstall(ctx context.Context) error {
 }
 
 func (c *Cluster) Ready(ctx context.Context) (bool, error) {
-	err := c.KubectlInCluster(ctx, utils.IOStreams{}, "get", "node")
+	out := bytes.NewBuffer(nil)
+	err := c.KubectlInCluster(ctx, utils.IOStreams{
+		Out:    out,
+		ErrOut: out,
+	}, "get", "node")
 	if err != nil {
 		return false, err
 	}
-	return true, nil
+
+	ready := !bytes.Contains(out.Bytes(), []byte("NotReady"))
+	return ready, nil
 }
 
 func (c *Cluster) WaitReady(ctx context.Context, timeout time.Duration) error {
