@@ -2,6 +2,9 @@
 
 # initialize the global variables
 function init_global_flags() {
+  echo "WARNNING: This script is no longer maintained, please migrate the refactored binary"
+  echo "  https://github.com/wzshiming/fake-k8s/releases"
+
   PROJECT_NAME="fake-k8s"
   TMPDIR="${TMPDIR:-/tmp}/${PROJECT_NAME}"
   TMPDIR="${TMPDIR//\/\//\/}"
