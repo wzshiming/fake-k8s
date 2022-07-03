@@ -6,15 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"strings"
 
 	fakeruntime "github.com/wzshiming/fake-k8s/pkg/runtime"
 	"github.com/wzshiming/fake-k8s/pkg/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/scheme"
+	oyaml "gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func Load(ctx context.Context, rt fakeruntime.Runtime, src string) error {
@@ -30,7 +30,7 @@ func Load(ctx context.Context, rt fakeruntime.Runtime, src string) error {
 	}
 	inputRaw := bytes.NewBuffer(nil)
 	outputRaw := bytes.NewBuffer(nil)
-	otherResource, err := load(objs, func(objs []runtime.Object) ([]runtime.Object, error) {
+	otherResource, err := load(objs, func(objs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
 		inputRaw.Reset()
 		outputRaw.Reset()
 
@@ -49,7 +49,7 @@ func Load(ctx context.Context, rt fakeruntime.Runtime, src string) error {
 		}, "create", "--validate=false", "-o", "json", "-f", "-")
 		if err != nil {
 			for _, obj := range objs {
-				fmt.Fprintf(os.Stderr, "%s/%s failed\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName())
+				fmt.Fprintf(os.Stderr, "%s/%s failed\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.GetName())
 			}
 		}
 		newObj, err := decodeObjects(outputRaw)
@@ -57,7 +57,7 @@ func Load(ctx context.Context, rt fakeruntime.Runtime, src string) error {
 			return nil, err
 		}
 		for _, obj := range newObj {
-			fmt.Fprintf(os.Stderr, "%s/%s succeed\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName())
+			fmt.Fprintf(os.Stderr, "%s/%s succeed\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.GetName())
 		}
 		return newObj, nil
 	})
@@ -65,7 +65,7 @@ func Load(ctx context.Context, rt fakeruntime.Runtime, src string) error {
 		return err
 	}
 	for _, obj := range otherResource {
-		fmt.Fprintf(os.Stderr, "%s/%s skipped\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName())
+		fmt.Fprintf(os.Stderr, "%s/%s skipped\n", strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind), obj.GetName())
 	}
 	return nil
 }
@@ -77,33 +77,49 @@ func openFile(path string) (io.ReadCloser, error) {
 	return os.Open(path)
 }
 
-func decodeObjects(data io.Reader) ([]runtime.Object, error) {
-	builder := resource.NewLocalBuilder().
-		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-		Stream(data, "input").
-		Flatten().
-		ContinueOnError()
+func decodeObjects(data io.Reader) ([]*unstructured.Unstructured, error) {
+	out := []*unstructured.Unstructured{}
+	tmp := map[string]interface{}{}
+	decoder := oyaml.NewDecoder(data)
+	for {
+		err := decoder.Decode(&tmp)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		data, err := oyaml.Marshal(tmp)
+		if err != nil {
+			return nil, err
+		}
+		data, err = yaml.YAMLToJSON(data)
+		if err != nil {
+			return nil, err
+		}
+		obj := &unstructured.Unstructured{}
+		err = obj.UnmarshalJSON(data)
+		if err != nil {
+			return nil, err
+		}
 
-	result := builder.Do()
-
-	if err := result.Err(); err != nil {
-		return nil, err
-	}
-	infos, err := result.Infos()
-	if err != nil {
-		return nil, err
-	}
-	objects := make([]runtime.Object, 0, len(infos))
-	for _, info := range infos {
-		if info.Object != nil {
-			objects = append(objects, info.Object)
+		if obj.IsList() {
+			err = obj.EachListItem(func(object runtime.Object) error {
+				out = append(out, object.DeepCopyObject().(*unstructured.Unstructured))
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			out = append(out, obj.DeepCopyObject().(*unstructured.Unstructured))
 		}
 	}
-	return objects, nil
+	return out, nil
 }
 
-func filter(input []runtime.Object, fun func(runtime.Object) bool) []runtime.Object {
-	ret := []runtime.Object{}
+func filter(input []*unstructured.Unstructured, fun func(*unstructured.Unstructured) bool) []*unstructured.Unstructured {
+	ret := []*unstructured.Unstructured{}
 	for _, i := range input {
 		if fun(i) {
 			ret = append(ret, i)
@@ -112,34 +128,30 @@ func filter(input []runtime.Object, fun func(runtime.Object) bool) []runtime.Obj
 	return ret
 }
 
-func load(input []runtime.Object, apply func([]runtime.Object) ([]runtime.Object, error)) ([]runtime.Object, error) {
-	applyResource := []runtime.Object{}
-	otherResource := []runtime.Object{}
+func load(input []*unstructured.Unstructured, apply func([]*unstructured.Unstructured) ([]*unstructured.Unstructured, error)) ([]*unstructured.Unstructured, error) {
+	applyResource := []*unstructured.Unstructured{}
+	otherResource := []*unstructured.Unstructured{}
 
 	for _, obj := range input {
-		if oma, ok := obj.(metav1.ObjectMetaAccessor); ok {
-			objMeta := oma.GetObjectMeta()
+		// These are built-in resources that do not need to be created
+		if obj.GetObjectKind().GroupVersionKind().Kind == "Namespace" &&
+			(obj.GetName() == "kube-public" ||
+				obj.GetName() == "kube-node-lease" ||
+				obj.GetName() == "kube-system" ||
+				obj.GetName() == "default") {
+			continue
+		}
 
-			// These are built-in resources that do not need to be created
-			if obj.GetObjectKind().GroupVersionKind().Kind == "Namespace" &&
-				(objMeta.GetName() == "kube-public" ||
-					objMeta.GetName() == "kube-node-lease" ||
-					objMeta.GetName() == "kube-system" ||
-					objMeta.GetName() == "default") {
-				continue
-			}
-
-			refs := objMeta.GetOwnerReferences()
-			if len(refs) != 0 && refs[0].Controller != nil && *refs[0].Controller {
-				otherResource = append(otherResource, obj)
-			} else {
-				applyResource = append(applyResource, obj)
-			}
+		refs := obj.GetOwnerReferences()
+		if len(refs) != 0 && refs[0].Controller != nil && *refs[0].Controller {
+			otherResource = append(otherResource, obj)
+		} else {
+			applyResource = append(applyResource, obj)
 		}
 	}
 
 	for len(applyResource) != 0 {
-		nextApplyResource := []runtime.Object{}
+		nextApplyResource := []*unstructured.Unstructured{}
 		newResource, err := apply(applyResource)
 		if err != nil {
 			return nil, err
@@ -148,25 +160,23 @@ func load(input []runtime.Object, apply func([]runtime.Object) ([]runtime.Object
 			break
 		}
 		for i, newObj := range newResource {
-			newObjMeta := newObj.(metav1.ObjectMetaAccessor).GetObjectMeta()
-			oldUid := applyResource[i].(metav1.ObjectMetaAccessor).GetObjectMeta().GetUID()
-			newUid := newObjMeta.GetUID()
+			oldUid := applyResource[i].GetUID()
+			newUid := newObj.GetUID()
 
-			remove := map[runtime.Object]struct{}{}
-			nextResource := filter(otherResource, func(otherObj runtime.Object) bool {
-				otherObjMeta := otherObj.(metav1.ObjectMetaAccessor).GetObjectMeta()
-				otherRefs := otherObjMeta.GetOwnerReferences()
+			remove := map[*unstructured.Unstructured]struct{}{}
+			nextResource := filter(otherResource, func(otherObj *unstructured.Unstructured) bool {
+				otherRefs := otherObj.GetOwnerReferences()
 				otherRef := &otherRefs[0]
 				if otherRef.UID != oldUid {
 					return false
 				}
 				otherRef.UID = newUid
-				otherObjMeta.SetOwnerReferences(otherRefs)
+				otherObj.SetOwnerReferences(otherRefs)
 				remove[otherObj] = struct{}{}
 				return true
 			})
 			if len(remove) != 0 {
-				otherResource = filter(otherResource, func(otherObj runtime.Object) bool {
+				otherResource = filter(otherResource, func(otherObj *unstructured.Unstructured) bool {
 					_, ok := remove[otherObj]
 					return !ok
 				})
