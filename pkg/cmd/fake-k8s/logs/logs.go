@@ -2,7 +2,6 @@ package logs
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -21,12 +20,7 @@ type flagpole struct {
 func NewCommand(logger log.Logger) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 1 {
-				return nil
-			}
-			return fmt.Errorf("unknown component for %q", cmd.CommandPath())
-		},
+		Args:  cobra.ExactArgs(1),
 		Use:   "logs",
 		Short: "Logs one of [etcd, kube-apiserver, kube-controller-manager, kube-scheduler, fake-kubelet, prometheus]",
 		Long:  "Logs one of [etcd, kube-apiserver, kube-controller-manager, kube-scheduler, fake-kubelet, prometheus]",
