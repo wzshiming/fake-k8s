@@ -1,12 +1,17 @@
 package load
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -65,30 +70,131 @@ func Test_load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			updated := []runtime.Object{}
-			apply := func(objs []runtime.Object) ([]runtime.Object, error) {
-				ret := []runtime.Object{}
+			updated := []*unstructured.Unstructured{}
+			apply := func(objs []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+				ret := []*unstructured.Unstructured{}
 				for _, obj := range objs {
-					o := obj.DeepCopyObject()
-					meta := o.(metav1.ObjectMetaAccessor).GetObjectMeta()
-					meta.SetUID(meta.GetUID() + "0")
+					o := obj.DeepCopyObject().(*unstructured.Unstructured)
+					o.SetUID(obj.GetUID() + "0")
 					ret = append(ret, o)
-					updated = append(updated, o.DeepCopyObject())
+					updated = append(updated, o)
 				}
 				return ret, nil
 			}
-			got, err := load(tt.args.input, apply)
+			input := []*unstructured.Unstructured{}
+			for _, i := range tt.args.input {
+				tmp, _ := json.Marshal(i)
+				u := &unstructured.Unstructured{}
+				u.UnmarshalJSON(tmp)
+				input = append(input, u)
+			}
+
+			got, err := load(input, apply)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("load() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !equality.Semantic.DeepEqual(got, tt.want) {
-				t.Errorf("load() got = %v, want %v", got, tt.want)
+
+			want := ObjectListToUnstructuredList(tt.want)
+			if !equality.Semantic.DeepEqual(got, want) {
+				t.Errorf("expected vs got:\n%s", cmp.Diff(want, got))
 			}
 
-			if !equality.Semantic.DeepEqual(updated, tt.wantUpdated) {
-				t.Errorf("load() got updated = \n%v, want updated \n%v", updated, tt.wantUpdated)
+			wantUpdated := ObjectListToUnstructuredList(tt.wantUpdated)
+			if !equality.Semantic.DeepEqual(updated, wantUpdated) {
+				t.Errorf("expected vs got:\n%s", cmp.Diff(updated, wantUpdated))
 			}
 		})
 	}
+}
+
+func Test_decodeObjects(t *testing.T) {
+	type args struct {
+		data io.Reader
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []runtime.Object
+		wantErr bool
+	}{
+		{
+			args: args{
+				data: bytes.NewBufferString(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers: []
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-2
+  namespace: test
+spec:
+  containers: []
+`),
+			},
+			want: []runtime.Object{
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+						"metadata": map[string]interface{}{
+							"name":      "test",
+							"namespace": "test",
+						},
+						"spec": map[string]interface{}{
+							"containers": []interface{}{},
+						},
+					},
+				},
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+						"metadata": map[string]interface{}{
+							"name":      "test-2",
+							"namespace": "test",
+						},
+						"spec": map[string]interface{}{
+							"containers": []interface{}{},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := decodeObjects(tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("decodeObjects() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			want := ObjectListToUnstructuredList(tt.want)
+			if !equality.Semantic.DeepEqual(got, want) {
+				t.Errorf("expected vs got:\n%s", cmp.Diff(want, got))
+			}
+		})
+	}
+}
+
+func ObjectListToUnstructuredList(objects []runtime.Object) []*unstructured.Unstructured {
+	out := []*unstructured.Unstructured{}
+	for _, obj := range objects {
+		out = append(out, ObjectToUnstructured(obj))
+	}
+	return out
+}
+
+func ObjectToUnstructured(object runtime.Object) *unstructured.Unstructured {
+	data, _ := json.Marshal(object)
+	u := &unstructured.Unstructured{}
+	u.UnmarshalJSON(data)
+	return u
 }
