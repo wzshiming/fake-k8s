@@ -124,6 +124,8 @@ fake-pod-794f9d7464-sgtdv   1/1     Running   0          1s    10.0.0.21   fake-
 
 ```
 
+See more: [fake-kubelet](https://github.com/wzshiming/fake-kubelet)
+
 ## License
 
 Licensed under the MIT License. See [LICENSE](https://github.com/wzshiming/fake-k8s/blob/master/LICENSE) for the full license text.
