@@ -17,6 +17,7 @@ fake-k8s is a tool for running Fake Kubernetes clusters
   For other than Linux you will need to compile Kubernetes binaries yourself.  
 - Docker (compose v2) (the default of other than Linux)  
   Start the fake cluster using the container.  
+  [Compose v2](https://docs.docker.com/compose/install/compose-plugin/) needs to be install on Linux 
 - Nerdctl  
   ditto.  
 - Kind  
